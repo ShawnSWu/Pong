@@ -25,7 +25,7 @@ func userOperationSetting() {
 	for {
 		updateState()
 		drawView()
-		time.Sleep(75 * time.Millisecond)
+		time.Sleep(65 * time.Millisecond)
 
 		key := readInput(inputChan)
 		if key == "Rune[w]" && isTouchTopBorder(player1) {
@@ -180,6 +180,11 @@ func drawView() {
 	}
 	//球
 	Print(ball.row, ball.col, ball.width, ball.height, PaddleSymbol)
+
+	//中線
+	width, height := screen.Size()
+	Print(0, width/2, 1, height, 0x2590)
+
 	screen.Show()
 }
 
@@ -189,5 +194,4 @@ func Print(row, col, width, height int, ch rune) {
 			screen.SetContent(col+c, row+r, ch, nil, tcell.StyleDefault)
 		}
 	}
-	screen.Show()
 }
