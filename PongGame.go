@@ -8,11 +8,11 @@ import (
 )
 
 var screen tcell.Screen
-var player1 *GameObject
-var player2 *GameObject
-var ball *GameObject
+var player1 *Paddle
+var player2 *Paddle
+var ball *Ball
 
-var gameObjects []*GameObject
+var paddles []*Paddle
 
 const BallSymbol = 0x25CF   // 球符號
 const PaddleSymbol = 0x2588 // 球拍符號
@@ -85,31 +85,42 @@ func initGameState() {
 	width, height := screen.Size()
 	paddleStart := height/2 - PaddleHeight/2
 
-	player1 = &GameObject{
-		row: paddleStart, col: 0, width: 1, height: PaddleHeight, symbol: PaddleSymbol,
-		velRow: 0, velCol: 0,
+	player1 = &Paddle{
+		GameObject: GameObject{row: paddleStart, col: 0, width: 1,
+			height: PaddleHeight, symbol: PaddleSymbol,
+			velRow: 0, velCol: 0},
+		nickName:     "Player one",
+		currentScore: 0,
 	}
 
-	player2 = &GameObject{
-		row: paddleStart, col: width - 2, width: 1, height: PaddleHeight, symbol: PaddleSymbol,
-		velRow: 0, velCol: 0,
+	player2 = &Paddle{
+		GameObject: GameObject{row: paddleStart, col: width - 2, width: 1,
+			height: PaddleHeight, symbol: PaddleSymbol,
+			velRow: 0, velCol: 0},
+		nickName:     "Player two",
+		currentScore: 0,
 	}
 
-	ball = &GameObject{
-		row: height / 2, col: width / 2, width: 1, height: 1, symbol: BallSymbol,
-		velRow: BallVelocityRow, velCol: BallVelocityCol,
+	ball = &Ball{
+		GameObject: GameObject{row: height / 2, col: width / 2, width: 1, height: 1, symbol: BallSymbol,
+			velRow: BallVelocityRow, velCol: BallVelocityCol},
 	}
 
-	gameObjects = []*GameObject{
-		player1, player2, ball,
+	paddles = []*Paddle{
+		player1,
+		player2,
 	}
 }
 
 func updateState() {
-	for i := range gameObjects {
-		gameObjects[i].row += gameObjects[i].velRow
-		gameObjects[i].col += gameObjects[i].velCol
+	//兩個球拍
+	for i := range paddles {
+		paddles[i].row += paddles[i].velRow
+		paddles[i].col += paddles[i].velCol
 	}
+	//球
+	ball.row += ball.velRow
+	ball.col += ball.velCol
 
 	//檢查有沒有撞到上下牆壁
 	if isCollidesWithWall(ball) {
@@ -121,12 +132,12 @@ func updateState() {
 	}
 }
 
-func isBallOutSide(ball *GameObject) bool {
+func isBallOutSide(ball *Ball) bool {
 	width, _ := screen.Size()
 	return ball.col < 0 || ball.col > width
 }
 
-func isTouchPaddle(ball *GameObject) bool {
+func isTouchPaddle(ball *Ball) bool {
 	if ball.col+ball.velCol == player1.col &&
 		(ball.row > player1.row && ball.row <= player1.row+PaddleHeight) {
 		return true
@@ -137,16 +148,16 @@ func isTouchPaddle(ball *GameObject) bool {
 	return false
 }
 
-func isTouchBottomBorder(paddle *GameObject) bool {
+func isTouchBottomBorder(paddle *Paddle) bool {
 	_, screenHeight := screen.Size()
 	return (paddle.row + paddle.height) < screenHeight
 }
 
-func isTouchTopBorder(paddle *GameObject) bool {
+func isTouchTopBorder(paddle *Paddle) bool {
 	return paddle.row > 0
 }
 
-func isCollidesWithWall(ball *GameObject) bool {
+func isCollidesWithWall(ball *Ball) bool {
 	_, screenHeight := screen.Size()
 	return ball.row+ball.velRow < 0 || ball.row+ball.velRow >= screenHeight
 }
@@ -163,9 +174,12 @@ func readInput(inputChan chan string) string {
 
 func drawView() {
 	screen.Clear()
-	for _, obj := range gameObjects {
+	//兩個球拍
+	for _, obj := range paddles {
 		Print(obj.row, obj.col, obj.width, obj.height, PaddleSymbol)
 	}
+	//球
+	Print(ball.row, ball.col, ball.width, ball.height, PaddleSymbol)
 	screen.Show()
 }
 
