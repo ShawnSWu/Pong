@@ -1,17 +1,26 @@
 package main
 
 type GameObject struct {
-	row, col, velRow, velCol int
-	width, height            int
-	symbol                   rune
-	nickName                 string
-	currentScore             int
+	row, col       int
+	width, height  int
+	velRow, velCol int
+	symbol         rune
 }
 
-func (p *GameObject) moveUp() {
+type Ball struct {
+	GameObject
+}
+
+type Paddle struct {
+	GameObject
+	nickName     string
+	currentScore int
+}
+
+func (p *Paddle) moveUp() {
 	p.row -= 1
 }
 
-func (p *GameObject) moveDown() {
+func (p *Paddle) moveDown() {
 	p.row += 1
 }
