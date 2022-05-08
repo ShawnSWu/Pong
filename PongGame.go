@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/gdamore/tcell"
 	"os"
+	"strconv"
 	"time"
 )
 
@@ -14,35 +15,39 @@ var ball *Ball
 
 var paddles []*Paddle
 
+const FinalScore = 9        // 遊戲結束分數
 const BallSymbol = 0x25CF   // 球符號
 const PaddleSymbol = 0x2588 // 球拍符號
 const PaddleHeight = 6      // 球拍高度
 const BallVelocityRow = 1
 const BallVelocityCol = 1
 
-func userOperationSetting() {
+func startGameLoop() {
 	inputChan := initUserInput()
 	for {
 		updateState()
 		drawView()
-		time.Sleep(75 * time.Millisecond)
+		time.Sleep(45 * time.Millisecond)
+		userOperationHandle(inputChan)
+	}
+}
 
-		key := readInput(inputChan)
-		if key == "Rune[w]" && isTouchTopBorder(player1) {
-			player1.moveUp()
-		}
+func userOperationHandle(inputChan chan string) {
+	key := readInput(inputChan)
+	if key == "Rune[w]" && isTouchTopBorder(player1) {
+		player1.moveUp()
+	}
 
-		if key == "Rune[s]" && isTouchBottomBorder(player1) {
-			player1.moveDown()
-		}
+	if key == "Rune[s]" && isTouchBottomBorder(player1) {
+		player1.moveDown()
+	}
 
-		if key == "Up" && isTouchTopBorder(player2) {
-			player2.moveUp()
-		}
+	if key == "Up" && isTouchTopBorder(player2) {
+		player2.moveUp()
+	}
 
-		if key == "Down" && isTouchBottomBorder(player2) {
-			player2.moveDown()
-		}
+	if key == "Down" && isTouchBottomBorder(player2) {
+		player2.moveDown()
 	}
 }
 
@@ -54,6 +59,8 @@ func initUserInput() chan string {
 	go func() {
 		for {
 			switch ev := screen.PollEvent().(type) {
+			case *tcell.EventResize:
+				drawView()
 			case *tcell.EventKey:
 				inputChan <- ev.Name()
 			}
@@ -130,11 +137,47 @@ func updateState() {
 	if isTouchPaddle(ball) {
 		ball.velCol = -ball.velCol
 	}
+
+	if isBallOutSide(ball) {
+		calculateScore(ball)
+		resetNewRound(ball)
+	}
+
+	over, _ := isGameOver()
+	if over {
+		os.Exit(0)
+	}
+}
+
+func resetNewRound(ball *Ball) {
+	width, height := screen.Size()
+	ball.row = height / 2
+	ball.col = width / 2
+}
+
+func isGameOver() (bool, *Paddle) {
+	if player1.currentScore == FinalScore {
+		return true, player1
+	}
+	if player2.currentScore == FinalScore {
+		return true, player2
+	}
+	return false, nil
 }
 
 func isBallOutSide(ball *Ball) bool {
 	width, _ := screen.Size()
 	return ball.col < 0 || ball.col > width
+}
+
+func calculateScore(ball *Ball) {
+	if ball.col < 0 {
+		player2.currentScore += 1
+	}
+	width, _ := screen.Size()
+	if ball.col > width {
+		player1.currentScore += 1
+	}
 }
 
 func isTouchPaddle(ball *Ball) bool {
@@ -180,6 +223,15 @@ func drawView() {
 	}
 	//球
 	Print(ball.row, ball.col, ball.width, ball.height, PaddleSymbol)
+
+	//中線
+	width, height := screen.Size()
+	Print(0, width/2, 1, height, 0x2590)
+
+	//分數更新
+	drawLetters(12, 1, strconv.Itoa(player1.currentScore))
+	drawLetters(61, 1, strconv.Itoa(player2.currentScore))
+
 	screen.Show()
 }
 
@@ -189,5 +241,31 @@ func Print(row, col, width, height int, ch rune) {
 			screen.SetContent(col+c, row+r, ch, nil, tcell.StyleDefault)
 		}
 	}
-	screen.Show()
+}
+
+func drawLetters(x int, y int, word string) {
+	letterWidth, letterHeight := 1, 1
+	letterNum := len(word)
+	totalLen := letterNum*letterWidth + (letterNum - 1)
+	startX := x - totalLen/2
+	offsetY := y - letterHeight/2
+
+	for i, letter := range word {
+		letterCells := getCellsFromChar(string(letter))
+
+		offsetX := startX + totalLen/letterNum*i
+		offsetX += i - 1
+
+		for _, cell := range letterCells {
+			finalX := offsetX + int(cell[0])
+			finalY := offsetY + int(cell[1])
+			screen.SetContent(finalX, finalY, BallSymbol, nil, tcell.Style(tcell.ColorWhite))
+		}
+	}
+}
+
+func gameStart() {
+	initScreen()
+	initGameState()
+	startGameLoop()
 }
