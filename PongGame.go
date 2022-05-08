@@ -22,29 +22,32 @@ const PaddleHeight = 6      // 球拍高度
 const BallVelocityRow = 1
 const BallVelocityCol = 1
 
-func userOperationSetting() {
+func startGameLoop() {
 	inputChan := initUserInput()
 	for {
 		updateState()
 		drawView()
-		time.Sleep(65 * time.Millisecond)
+		time.Sleep(45 * time.Millisecond)
+		userOperationHandle(inputChan)
+	}
+}
 
-		key := readInput(inputChan)
-		if key == "Rune[w]" && isTouchTopBorder(player1) {
-			player1.moveUp()
-		}
+func userOperationHandle(inputChan chan string) {
+	key := readInput(inputChan)
+	if key == "Rune[w]" && isTouchTopBorder(player1) {
+		player1.moveUp()
+	}
 
-		if key == "Rune[s]" && isTouchBottomBorder(player1) {
-			player1.moveDown()
-		}
+	if key == "Rune[s]" && isTouchBottomBorder(player1) {
+		player1.moveDown()
+	}
 
-		if key == "Up" && isTouchTopBorder(player2) {
-			player2.moveUp()
-		}
+	if key == "Up" && isTouchTopBorder(player2) {
+		player2.moveUp()
+	}
 
-		if key == "Down" && isTouchBottomBorder(player2) {
-			player2.moveDown()
-		}
+	if key == "Down" && isTouchBottomBorder(player2) {
+		player2.moveDown()
 	}
 }
 
@@ -146,6 +149,12 @@ func updateState() {
 	}
 }
 
+func resetNewRound(ball *Ball) {
+	width, height := screen.Size()
+	ball.row = height / 2
+	ball.col = width / 2
+}
+
 func isGameOver() (bool, *Paddle) {
 	if player1.currentScore == FinalScore {
 		return true, player1
@@ -154,12 +163,6 @@ func isGameOver() (bool, *Paddle) {
 		return true, player2
 	}
 	return false, nil
-}
-
-func resetNewRound(ball *Ball) {
-	width, height := screen.Size()
-	ball.row = height / 2
-	ball.col = width / 2
 }
 
 func isBallOutSide(ball *Ball) bool {
@@ -259,4 +262,10 @@ func drawLetters(x int, y int, word string) {
 			screen.SetContent(finalX, finalY, BallSymbol, nil, tcell.Style(tcell.ColorWhite))
 		}
 	}
+}
+
+func gameStart() {
+	initScreen()
+	initGameState()
+	startGameLoop()
 }
