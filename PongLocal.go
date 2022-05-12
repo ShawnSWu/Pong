@@ -1,6 +1,7 @@
 package main
 
 import (
+	"Pong/core"
 	"fmt"
 	"github.com/gdamore/tcell"
 	"os"
@@ -9,11 +10,9 @@ import (
 )
 
 var screen tcell.Screen
-var player1 *Paddle
-var player2 *Paddle
-var ball *Ball
-
-var paddles []*Paddle
+var player1 *core.Paddle
+var player2 *core.Paddle
+var ball *core.Ball
 
 const FinalScore = 9        // 遊戲結束分數
 const BallSymbol = 0x25CF   // 球符號
@@ -35,19 +34,19 @@ func startGameLoop() {
 func userOperationHandle(inputChan chan string) {
 	key := readInput(inputChan)
 	if key == "Rune[w]" && isTouchTopBorder(player1) {
-		player1.moveUp()
+		player1.MoveUp()
 	}
 
 	if key == "Rune[s]" && isTouchBottomBorder(player1) {
-		player1.moveDown()
+		player1.MoveDown()
 	}
 
 	if key == "Up" && isTouchTopBorder(player2) {
-		player2.moveUp()
+		player2.MoveUp()
 	}
 
 	if key == "Down" && isTouchBottomBorder(player2) {
-		player2.moveDown()
+		player2.MoveDown()
 	}
 }
 
@@ -92,50 +91,45 @@ func initGameState() {
 	width, height := screen.Size()
 	paddleStart := height/2 - PaddleHeight/2
 
-	player1 = &Paddle{
-		GameObject: GameObject{row: paddleStart, col: 0, width: 1,
-			height: PaddleHeight, symbol: PaddleSymbol,
-			velRow: 0, velCol: 0},
-		nickName:     "Player one",
-		currentScore: 0,
+	player1 = &core.Paddle{
+		GameObject: core.GameObject{Row: paddleStart, Col: 0, Width: 1,
+			Height: PaddleHeight, Symbol: PaddleSymbol,
+			VelRow: 0, VelCol: 0},
+		NickName:     "Player one",
+		CurrentScore: 0,
 	}
 
-	player2 = &Paddle{
-		GameObject: GameObject{row: paddleStart, col: width - 2, width: 1,
-			height: PaddleHeight, symbol: PaddleSymbol,
-			velRow: 0, velCol: 0},
-		nickName:     "Player two",
-		currentScore: 0,
+	player2 = &core.Paddle{
+		GameObject: core.GameObject{Row: paddleStart, Col: width - 2, Width: 1,
+			Height: PaddleHeight, Symbol: PaddleSymbol,
+			VelRow: 0, VelCol: 0},
+		NickName:     "Player two",
+		CurrentScore: 0,
 	}
 
-	ball = &Ball{
-		GameObject: GameObject{row: height / 2, col: width / 2, width: 1, height: 1, symbol: BallSymbol,
-			velRow: BallVelocityRow, velCol: BallVelocityCol},
+	ball = &core.Ball{
+		GameObject: core.GameObject{Row: height / 2, Col: width / 2, Width: 1, Height: 1, Symbol: BallSymbol,
+			VelRow: BallVelocityRow, VelCol: BallVelocityCol},
 	}
 
-	paddles = []*Paddle{
-		player1,
-		player2,
-	}
 }
 
 func updateState() {
 	//兩個球拍
-	for i := range paddles {
-		paddles[i].row += paddles[i].velRow
-		paddles[i].col += paddles[i].velCol
-	}
+	player1.Row += player1.VelRow
+	player2.Row += player2.VelRow
+
 	//球
-	ball.row += ball.velRow
-	ball.col += ball.velCol
+	ball.Row += ball.VelRow
+	ball.Col += ball.VelCol
 
 	//檢查有沒有撞到上下牆壁
 	if isCollidesWithWall(ball) {
-		ball.velRow = -ball.velRow
+		ball.VelRow = -ball.VelRow
 	}
 	//檢查是否有碰到球拍
 	if isTouchPaddle(ball) {
-		ball.velCol = -ball.velCol
+		ball.VelCol = -ball.VelCol
 	}
 
 	if isBallOutSide(ball) {
@@ -149,60 +143,60 @@ func updateState() {
 	}
 }
 
-func resetNewRound(ball *Ball) {
+func resetNewRound(ball *core.Ball) {
 	width, height := screen.Size()
-	ball.row = height / 2
-	ball.col = width / 2
+	ball.Row = height / 2
+	ball.Col = width / 2
 }
 
-func isGameOver() (bool, *Paddle) {
-	if player1.currentScore == FinalScore {
+func isGameOver() (bool, *core.Paddle) {
+	if player1.CurrentScore == FinalScore {
 		return true, player1
 	}
-	if player2.currentScore == FinalScore {
+	if player2.CurrentScore == FinalScore {
 		return true, player2
 	}
 	return false, nil
 }
 
-func isBallOutSide(ball *Ball) bool {
+func isBallOutSide(ball *core.Ball) bool {
 	width, _ := screen.Size()
-	return ball.col < 0 || ball.col > width
+	return ball.Col < 0 || ball.Col > width
 }
 
-func calculateScore(ball *Ball) {
-	if ball.col < 0 {
-		player2.currentScore += 1
+func calculateScore(ball *core.Ball) {
+	if ball.Col < 0 {
+		player2.CurrentScore += 1
 	}
 	width, _ := screen.Size()
-	if ball.col > width {
-		player1.currentScore += 1
+	if ball.Col > width {
+		player1.CurrentScore += 1
 	}
 }
 
-func isTouchPaddle(ball *Ball) bool {
-	if ball.col+ball.velCol == player1.col &&
-		(ball.row > player1.row && ball.row <= player1.row+PaddleHeight) {
+func isTouchPaddle(ball *core.Ball) bool {
+	if ball.Col+ball.VelCol == player1.Col &&
+		(ball.Row > player1.Row && ball.Row <= player1.Row+PaddleHeight) {
 		return true
-	} else if ball.col+ball.velCol == player2.col &&
-		(ball.row > player2.row && ball.row <= player2.row+PaddleHeight) {
+	} else if ball.Col+ball.VelCol == player2.Col &&
+		(ball.Row > player2.Row && ball.Row <= player2.Row+PaddleHeight) {
 		return true
 	}
 	return false
 }
 
-func isTouchBottomBorder(paddle *Paddle) bool {
+func isTouchBottomBorder(paddle *core.Paddle) bool {
 	_, screenHeight := screen.Size()
-	return (paddle.row + paddle.height) < screenHeight
+	return (paddle.Row + paddle.Height) < screenHeight
 }
 
-func isTouchTopBorder(paddle *Paddle) bool {
-	return paddle.row > 0
+func isTouchTopBorder(paddle *core.Paddle) bool {
+	return paddle.Row > 0
 }
 
-func isCollidesWithWall(ball *Ball) bool {
+func isCollidesWithWall(ball *core.Ball) bool {
 	_, screenHeight := screen.Size()
-	return ball.row+ball.velRow < 0 || ball.row+ball.velRow >= screenHeight
+	return ball.Row+ball.VelRow < 0 || ball.Row+ball.VelRow >= screenHeight
 }
 
 func readInput(inputChan chan string) string {
@@ -218,19 +212,21 @@ func readInput(inputChan chan string) string {
 func drawView() {
 	screen.Clear()
 	//兩個球拍
-	for _, obj := range paddles {
-		Print(obj.row, obj.col, obj.width, obj.height, PaddleSymbol)
-	}
+	windowWidth, windowheight := screen.Size()
+	//刷新畫面時，確保player2球拍能在最右邊
+	player2.Col = windowWidth - 2
+	Print(player1.Row, player1.Col, player1.Width, player1.Height, PaddleSymbol)
+	Print(player2.Row, player2.Col, player2.Width, player2.Height, PaddleSymbol)
+
 	//球
-	Print(ball.row, ball.col, ball.width, ball.height, PaddleSymbol)
+	Print(ball.Row, ball.Col, ball.Width, ball.Height, PaddleSymbol)
 
 	//中線
-	width, height := screen.Size()
-	Print(0, width/2, 1, height, 0x2590)
+	Print(0, windowWidth/2, 1, windowheight, 0x2590)
 
 	//分數更新
-	drawLetters(12, 1, strconv.Itoa(player1.currentScore))
-	drawLetters(61, 1, strconv.Itoa(player2.currentScore))
+	drawLetters(windowWidth/4, 1, strconv.Itoa(player1.CurrentScore))
+	drawLetters((windowWidth/4)*3, 1, strconv.Itoa(player2.CurrentScore))
 
 	screen.Show()
 }
@@ -264,7 +260,7 @@ func drawLetters(x int, y int, word string) {
 	}
 }
 
-func gameStart() {
+func start() {
 	initScreen()
 	initGameState()
 	startGameLoop()
