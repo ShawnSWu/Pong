@@ -1,9 +1,10 @@
-package server
+package main
 
 import (
 	core "Pong/core"
 	"bufio"
 	"fmt"
+	"io"
 	"net"
 	"os"
 	"time"
@@ -19,13 +20,15 @@ const BallVelocityCol = 1
 const windowHeight = 60
 const windowWidth = 150
 
-var onlinePlayerCount = 0
-
 var player1 *core.Paddle
 var player2 *core.Paddle
 var ball *core.Ball
 
-var paddles []*core.Paddle
+var playerList = make(map[string]string)
+
+var paddles = make(map[string]*core.Paddle)
+
+var playerConn []*net.Conn
 
 func initGameState() {
 
@@ -52,10 +55,6 @@ func initGameState() {
 			VelRow: BallVelocityRow, VelCol: BallVelocityCol},
 	}
 
-	paddles = []*core.Paddle{
-		player1,
-		player2,
-	}
 }
 
 func updateState() {
@@ -144,33 +143,23 @@ func readClientInput(connP *net.Conn) {
 
 	for {
 		userCommand, _ := bufio.NewReader(conn).ReadString('.')
-		//fmt.Print("Message Address:", conn.RemoteAddr(), "\n")
-		//fmt.Print("Message Received:", userCommand, "\n")
-
-		handleInput(userCommand)
+		handleInput(userCommand, connP)
 		time.Sleep(10 * time.Millisecond)
 	}
 }
 
 func startService() {
 
-	tcpAddr, _ := net.ResolveTCPAddr("tcp4", "127.0.0.1:4321")
-	listener, _ := net.ListenTCP("tcp", tcpAddr)
+	conn1 := playerConn[0]
+	conn2 := playerConn[1]
 
-	// accept connection
-	conn, _ := listener.Accept()
-
-	if player1.IpAddress != "" {
-		player1.IpAddress = conn.RemoteAddr().String()
-	} else {
-		player2.IpAddress = conn.RemoteAddr().String()
-	}
-
-	go readClientInput(&conn)
+	go readClientInput(conn1)
+	go readClientInput(conn2)
 
 	for {
 		updateState()
-		sendToClient(&conn)
+		sendToClient(conn1)
+		sendToClient(conn2)
 		time.Sleep(65 * time.Millisecond)
 	}
 }
@@ -193,35 +182,124 @@ func sendToClient(connP *net.Conn) {
 	conn.Write([]byte(payload))
 }
 
-func handleInput(userCommand string) {
+func handleInput(userCommand string, connP *net.Conn) {
+	conn := *connP
 	if userCommand == "" {
 		return
 	}
 	userCommand = string([]byte(userCommand)[:len(userCommand)-1])
+
+	paddle := playerList[conn.RemoteAddr().String()]
+	fmt.Println("@@@@@@@@@@@@ ", paddle)
+
 	switch userCommand {
 	case "U":
-		player2.MoveUp()
+		if paddle == "player1" {
+			player1.MoveUp()
+		} else {
+			player2.MoveUp()
+		}
 		break
 
 	case "D":
-		player2.MoveDown()
-		break
-
-	case "w":
-		player1.MoveUp()
-		break
-
-	case "s":
-		player1.MoveDown()
+		if paddle == "player1" {
+			player1.MoveDown()
+		} else {
+			player2.MoveDown()
+		}
 		break
 	}
 }
 
+func waitingPlayer() {
+
+	tcpAddr, _ := net.ResolveTCPAddr("tcp4", "127.0.0.1:4321")
+	listener, _ := net.ListenTCP("tcp", tcpAddr)
+
+	var c = 0
+	for {
+		fmt.Println("等待連線....")
+
+		conn, _ := listener.Accept()
+
+		if len(paddles) < 2 {
+			ip := conn.RemoteAddr().String()
+			c += 1
+			if playerList[ip] == "" {
+				playerList[ip] = fmt.Sprintf("player%d", c)
+			}
+
+			fmt.Println("玩家人數 ", playerList)
+			playerConn = append(playerConn, &conn)
+
+			if len(playerList) == 2 {
+				startOnline()
+			}
+
+			//監視玩家連線狀態
+			//go monitorConnectionStatus(conn)
+
+			continue
+		} else {
+			//人數已滿
+			conn.Write([]byte("caf."))
+		}
+
+		time.Sleep(10 * time.Millisecond)
+	}
+}
+
+func generatePlayer(ip string) *core.Paddle {
+	return &core.Paddle{IpAddress: ip}
+}
+
 func startOnline() {
+	fmt.Println("遊戲開始！！！")
 	initGameState()
 	startService()
 }
 
 func main() {
-	startOnline()
+	waitingPlayer()
+}
+
+func monitorConnectionStatus(conn net.Conn) {
+	defer conn.Close()
+	notify := make(chan error)
+	go func() {
+		buf := make([]byte, 1024)
+		for {
+			n, err := conn.Read(buf)
+			if err != nil {
+				notify <- err
+				return
+			}
+			if n > 0 {
+				fmt.Println("unexpected data: %s", buf[:n])
+			}
+		}
+	}()
+	connectAlive := true
+
+	for {
+		select {
+		case err := <-notify:
+			if io.EOF == err {
+				ip := conn.RemoteAddr().String()
+				fmt.Println(fmt.Sprintf("%s斷線,", ip), err)
+				delete(paddles, ip)
+				fmt.Println("目前人數:", len(paddles))
+				connectAlive = false
+				break
+			}
+		case <-time.After(time.Second * 1):
+			cm := fmt.Sprintf("%s, still alive", conn.RemoteAddr().String())
+			fmt.Println(cm)
+		}
+
+		if connectAlive == false {
+			break
+		}
+	}
+
 }
