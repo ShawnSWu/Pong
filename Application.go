@@ -1,5 +1,7 @@
 package main
 
+import "Pong/core"
+
 func main() {
-	//client.start()
+	core.Start()
 }

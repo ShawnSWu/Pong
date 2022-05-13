@@ -1,7 +1,6 @@
-package main
+package core
 
 import (
-	"Pong/server/core"
 	"bufio"
 	"fmt"
 	"github.com/google/uuid"
@@ -59,12 +58,12 @@ func updateState(room *Room) {
 	}
 }
 
-func resetNewRound(ball *core.Ball) {
+func resetNewRound(ball *Ball) {
 	ball.Row = windowHeight / 2
 	ball.Col = windowWidth / 2
 }
 
-func isGameOver(room *Room) (bool, *core.Player) {
+func isGameOver(room *Room) (bool, *Player) {
 	player1 := room.Player1
 	player2 := room.Player2
 
@@ -77,7 +76,7 @@ func isGameOver(room *Room) (bool, *core.Player) {
 	return false, nil
 }
 
-func isBallOutSide(ball *core.Ball) bool {
+func isBallOutSide(ball *Ball) bool {
 	return ball.Col < 0 || ball.Col > windowWidth
 }
 
@@ -109,19 +108,19 @@ func isTouchPaddle(room *Room) bool {
 	return false
 }
 
-func isTouchBottomBorder(paddle *core.Player) bool {
+func isTouchBottomBorder(paddle *Player) bool {
 	return (paddle.Row + paddle.Height) < windowHeight
 }
 
-func isTouchTopBorder(paddle *core.Player) bool {
+func isTouchTopBorder(paddle *Player) bool {
 	return paddle.Row > 0
 }
 
-func isCollidesWithWall(ball *core.Ball) bool {
+func isCollidesWithWall(ball *Ball) bool {
 	return ball.Row+ball.VelRow < 0 || ball.Row+ball.VelRow >= windowHeight
 }
 
-func readClientInput(room *Room, connP *net.Conn, player *core.Player) {
+func readClientInput(room *Room, connP *net.Conn, player *Player) {
 	conn := *connP
 
 	for {
@@ -171,7 +170,7 @@ func sendToClient(room *Room, connP *net.Conn) {
 	conn.Write([]byte(payload))
 }
 
-func handleInput(room *Room, userCommand string, player *core.Player) {
+func handleInput(room *Room, userCommand string, player *Player) {
 	if userCommand == "" {
 		return
 	}
@@ -249,11 +248,11 @@ func waitingPlayer() {
 	}
 }
 
-func generateGameElement(ip string) (*core.Player, *core.Player, *core.Ball) {
+func generateGameElement(ip string) (*Player, *Player, *Ball) {
 	paddleStart := windowHeight/2 - PaddleHeight/2
 
-	player1 := &core.Player{
-		GameObject: core.GameObject{Row: paddleStart, Col: 0,
+	player1 := &Player{
+		GameObject: GameObject{Row: paddleStart, Col: 0,
 			Width: 1, Height: PaddleHeight,
 			Symbol: PaddleSymbol,
 			VelRow: 0, VelCol: 0,
@@ -264,8 +263,8 @@ func generateGameElement(ip string) (*core.Player, *core.Player, *core.Ball) {
 		RightOrLeft:  "left",
 	}
 
-	player2 := &core.Player{
-		GameObject: core.GameObject{Row: paddleStart, Col: windowWidth - 2, Width: 1,
+	player2 := &Player{
+		GameObject: GameObject{Row: paddleStart, Col: windowWidth - 2, Width: 1,
 			Height: PaddleHeight, Symbol: PaddleSymbol,
 			VelRow: 0, VelCol: 0},
 		NickName:     "Player two",
@@ -274,8 +273,8 @@ func generateGameElement(ip string) (*core.Player, *core.Player, *core.Ball) {
 		RightOrLeft:  "right",
 	}
 
-	ball := &core.Ball{
-		GameObject: core.GameObject{Row: windowHeight / 2, Col: windowWidth / 2, Width: 1, Height: 1, Symbol: BallSymbol,
+	ball := &Ball{
+		GameObject: GameObject{Row: windowHeight / 2, Col: windowWidth / 2, Width: 1, Height: 1, Symbol: BallSymbol,
 			VelRow: BallVelocityRow, VelCol: BallVelocityCol},
 	}
 
@@ -287,7 +286,7 @@ func startOnline(room *Room) {
 	startService(room)
 }
 
-func main() {
+func Start() {
 	waitingPlayer()
 }
 
