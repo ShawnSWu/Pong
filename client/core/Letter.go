@@ -1,6 +1,6 @@
-package main
+package core
 
-func getCellsFromChar(n string) [][]uint {
+func GetCellsFromChar(n string) [][]uint {
 	switch n {
 	case "O", "0":
 		return [][]uint{
