@@ -1,6 +1,7 @@
 package core
 
 import (
+	"Pong/logger"
 	"bufio"
 	"fmt"
 	"github.com/google/uuid"
@@ -19,8 +20,13 @@ const BallVelocityCol = 1
 const windowHeight = 60
 const windowWidth = 150
 
+const MaxRoomCount = 10
+
 //大廳玩家
 var lobbyPlayer = make(map[string]*net.Conn)
+
+//最多同時10間房間
+var lobbyRoom = make([]*Room, 0, 10)
 
 func updateState(room *Room) {
 	player1 := room.Player1
@@ -208,13 +214,23 @@ func waitingPlayer() {
 	listener, _ := net.ListenTCP("tcp", tcpAddr)
 
 	for {
-		fmt.Println("等待連線....")
+		logger.Log.Info("Server launch 等待連線...")
 
 		conn, _ := listener.Accept()
 		ip := conn.RemoteAddr().String()
+		logger.Log.Info(fmt.Sprintf("Player已連線 (ip:%s)", ip))
+
+		if len(lobbyRoom) >= MaxRoomCount {
+			//sent message to client say full room
+			//close connection
+			conn.Close()
+			logger.Log.Info(fmt.Sprintf("連線已滿，關閉ip:%s 的連線", ip))
+			continue
+		}
 
 		if lobbyPlayer[ip] == nil {
 			lobbyPlayer[ip] = &conn
+			logger.Log.Info(fmt.Sprintf("Player ip:%s 進入大廳", ip))
 		}
 
 		if len(lobbyPlayer) < 2 {
@@ -225,8 +241,7 @@ func waitingPlayer() {
 			player1, player2, ball := generateGameElement(ip)
 
 			var tempList []*net.Conn
-			for k, v := range lobbyPlayer {
-				fmt.Println(fmt.Sprintf("%s: %s", k, v))
+			for _, v := range lobbyPlayer {
 				tempList = append(tempList, v)
 			}
 
@@ -240,6 +255,8 @@ func waitingPlayer() {
 			}
 
 			go startOnline(room)
+
+			lobbyRoom = append(lobbyRoom, room)
 
 			//開始遊戲後移除LobbyPlayer等待下一波玩家
 			lobbyPlayer = make(map[string]*net.Conn)
@@ -282,7 +299,7 @@ func generateGameElement(ip string) (*Player, *Player, *Ball) {
 }
 
 func startOnline(room *Room) {
-	fmt.Println("遊戲開始！！！")
+	logger.Log.Info(fmt.Sprintf("Room id:%s 遊戲開始！", room.RoomId))
 	startService(room)
 }
 

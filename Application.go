@@ -1,7 +1,11 @@
 package main
 
-import "Pong/core"
+import (
+	"Pong/core"
+	"Pong/logger"
+)
 
 func main() {
+	logger.Log.Init()
 	core.Start()
 }
