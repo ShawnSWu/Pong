@@ -1,10 +1,10 @@
 package main
 
 import (
-	core "Pong/core"
+	"Pong/server/core"
 	"bufio"
 	"fmt"
-	"io"
+	"github.com/google/uuid"
 	"net"
 	"os"
 	"time"
@@ -20,49 +20,21 @@ const BallVelocityCol = 1
 const windowHeight = 60
 const windowWidth = 150
 
-var player1 *core.Paddle
-var player2 *core.Paddle
-var ball *core.Ball
+//大廳玩家
+var lobbyPlayer = make(map[string]*net.Conn)
 
-var playerList = make(map[string]string)
+func updateState(room *Room) {
+	player1 := room.Player1
+	player2 := room.Player2
+	ball := room.Ball
 
-var paddles = make(map[string]*core.Paddle)
+	//玩家ㄧ球拍
+	player1.Row += player1.VelRow
+	player1.Col += player1.VelCol
+	//玩家二球拍
+	player2.Row += player2.VelRow
+	player2.Col += player2.VelCol
 
-var playerConn []*net.Conn
-
-func initGameState() {
-
-	paddleStart := windowHeight/2 - PaddleHeight/2
-
-	player1 = &core.Paddle{
-		GameObject: core.GameObject{Row: paddleStart, Col: 0, Width: 1,
-			Height: PaddleHeight, Symbol: PaddleSymbol,
-			VelRow: 0, VelCol: 0},
-		NickName:     "Player one",
-		CurrentScore: 0,
-	}
-
-	player2 = &core.Paddle{
-		GameObject: core.GameObject{Row: paddleStart, Col: windowWidth - 2, Width: 1,
-			Height: PaddleHeight, Symbol: PaddleSymbol,
-			VelRow: 0, VelCol: 0},
-		NickName:     "Player two",
-		CurrentScore: 0,
-	}
-
-	ball = &core.Ball{
-		GameObject: core.GameObject{Row: windowHeight / 2, Col: windowWidth / 2, Width: 1, Height: 1, Symbol: BallSymbol,
-			VelRow: BallVelocityRow, VelCol: BallVelocityCol},
-	}
-
-}
-
-func updateState() {
-	//兩個球拍
-	for i := range paddles {
-		paddles[i].Row += paddles[i].VelRow
-		paddles[i].Col += paddles[i].VelCol
-	}
 	//球
 	ball.Row += ball.VelRow
 	ball.Col += ball.VelCol
@@ -72,16 +44,16 @@ func updateState() {
 		ball.VelRow = -ball.VelRow
 	}
 	//檢查是否有碰到球拍
-	if isTouchPaddle(ball) {
+	if isTouchPaddle(room) {
 		ball.VelCol = -ball.VelCol
 	}
 
 	if isBallOutSide(ball) {
-		calculateScore(ball)
+		calculateScore(room)
 		resetNewRound(ball)
 	}
 
-	over, _ := isGameOver()
+	over, _ := isGameOver(room)
 	if over {
 		os.Exit(0)
 	}
@@ -92,7 +64,10 @@ func resetNewRound(ball *core.Ball) {
 	ball.Col = windowWidth / 2
 }
 
-func isGameOver() (bool, *core.Paddle) {
+func isGameOver(room *Room) (bool, *core.Player) {
+	player1 := room.Player1
+	player2 := room.Player2
+
 	if player1.CurrentScore == FinalScore {
 		return true, player1
 	}
@@ -106,7 +81,11 @@ func isBallOutSide(ball *core.Ball) bool {
 	return ball.Col < 0 || ball.Col > windowWidth
 }
 
-func calculateScore(ball *core.Ball) {
+func calculateScore(room *Room) {
+	player1 := room.Player1
+	player2 := room.Player2
+	ball := room.Ball
+
 	if ball.Col < 0 {
 		player2.CurrentScore += 1
 	}
@@ -115,7 +94,11 @@ func calculateScore(ball *core.Ball) {
 	}
 }
 
-func isTouchPaddle(ball *core.Ball) bool {
+func isTouchPaddle(room *Room) bool {
+	player1 := room.Player1
+	player2 := room.Player2
+	ball := room.Ball
+
 	if ball.Col+ball.VelCol <= player1.Col &&
 		(ball.Row > player1.Row && ball.Row <= player1.Row+PaddleHeight) {
 		return true
@@ -126,11 +109,11 @@ func isTouchPaddle(ball *core.Ball) bool {
 	return false
 }
 
-func isTouchBottomBorder(paddle *core.Paddle) bool {
+func isTouchBottomBorder(paddle *core.Player) bool {
 	return (paddle.Row + paddle.Height) < windowHeight
 }
 
-func isTouchTopBorder(paddle *core.Paddle) bool {
+func isTouchTopBorder(paddle *core.Player) bool {
 	return paddle.Row > 0
 }
 
@@ -138,33 +121,39 @@ func isCollidesWithWall(ball *core.Ball) bool {
 	return ball.Row+ball.VelRow < 0 || ball.Row+ball.VelRow >= windowHeight
 }
 
-func readClientInput(connP *net.Conn) {
+func readClientInput(room *Room, connP *net.Conn, player *core.Player) {
 	conn := *connP
 
 	for {
 		userCommand, _ := bufio.NewReader(conn).ReadString('.')
-		handleInput(userCommand, connP)
+		handleInput(room, userCommand, player)
 		time.Sleep(10 * time.Millisecond)
 	}
 }
 
-func startService() {
+func startService(room *Room) {
 
-	conn1 := playerConn[0]
-	conn2 := playerConn[1]
+	player1 := room.Player1
+	player2 := room.Player2
+	conn1 := room.Player1Conn
+	conn2 := room.Player2Conn
 
-	go readClientInput(conn1)
-	go readClientInput(conn2)
+	go readClientInput(room, conn1, player1)
+	go readClientInput(room, conn2, player2)
 
 	for {
-		updateState()
-		sendToClient(conn1)
-		sendToClient(conn2)
+		updateState(room)
+		sendToClient(room, conn1)
+		sendToClient(room, conn2)
 		time.Sleep(65 * time.Millisecond)
 	}
 }
 
-func sendToClient(connP *net.Conn) {
+func sendToClient(room *Room, connP *net.Conn) {
+	player1 := room.Player1
+	player2 := room.Player2
+	ball := room.Ball
+
 	ballX := ball.Col
 	ballY := ball.Row
 	player1X := player1.Col
@@ -182,29 +171,32 @@ func sendToClient(connP *net.Conn) {
 	conn.Write([]byte(payload))
 }
 
-func handleInput(userCommand string, connP *net.Conn) {
-	conn := *connP
+func handleInput(room *Room, userCommand string, player *core.Player) {
 	if userCommand == "" {
 		return
 	}
-	userCommand = string([]byte(userCommand)[:len(userCommand)-1])
+	player1 := room.Player1
+	player2 := room.Player2
 
-	paddle := playerList[conn.RemoteAddr().String()]
-	fmt.Println("@@@@@@@@@@@@ ", paddle)
+	userCommand = string([]byte(userCommand)[:len(userCommand)-1])
 
 	switch userCommand {
 	case "U":
-		if paddle == "player1" {
+		if player.RightOrLeft == "left" && isTouchTopBorder(player1) {
 			player1.MoveUp()
-		} else {
+		}
+
+		if player.RightOrLeft == "right" && isTouchTopBorder(player2) {
 			player2.MoveUp()
 		}
 		break
 
 	case "D":
-		if paddle == "player1" {
+		if player.RightOrLeft == "left" && isTouchBottomBorder(player1) {
 			player1.MoveDown()
-		} else {
+		}
+
+		if player.RightOrLeft == "right" && isTouchBottomBorder(player2) {
 			player2.MoveDown()
 		}
 		break
@@ -216,53 +208,90 @@ func waitingPlayer() {
 	tcpAddr, _ := net.ResolveTCPAddr("tcp4", "127.0.0.1:4321")
 	listener, _ := net.ListenTCP("tcp", tcpAddr)
 
-	var c = 0
 	for {
 		fmt.Println("等待連線....")
 
 		conn, _ := listener.Accept()
+		ip := conn.RemoteAddr().String()
 
-		if len(paddles) < 2 {
-			ip := conn.RemoteAddr().String()
-			c += 1
-			if playerList[ip] == "" {
-				playerList[ip] = fmt.Sprintf("player%d", c)
-			}
-
-			fmt.Println("玩家人數 ", playerList)
-			playerConn = append(playerConn, &conn)
-
-			if len(playerList) == 2 {
-				startOnline()
-			}
-
-			//監視玩家連線狀態
-			//go monitorConnectionStatus(conn)
-
-			continue
-		} else {
-			//人數已滿
-			conn.Write([]byte("caf."))
+		if lobbyPlayer[ip] == nil {
+			lobbyPlayer[ip] = &conn
 		}
 
+		if len(lobbyPlayer) < 2 {
+			continue
+		}
+
+		if len(lobbyPlayer) == 2 {
+			player1, player2, ball := generateGameElement(ip)
+
+			var tempList []*net.Conn
+			for k, v := range lobbyPlayer {
+				fmt.Println(fmt.Sprintf("%s: %s", k, v))
+				tempList = append(tempList, v)
+			}
+
+			room := &Room{
+				RoomId:      uuid.New().String(),
+				Player1:     player1,
+				Player2:     player2,
+				Ball:        ball,
+				Player1Conn: tempList[0],
+				Player2Conn: tempList[1],
+			}
+
+			go startOnline(room)
+
+			//開始遊戲後移除LobbyPlayer等待下一波玩家
+			lobbyPlayer = make(map[string]*net.Conn)
+		}
 		time.Sleep(10 * time.Millisecond)
 	}
 }
 
-func generatePlayer(ip string) *core.Paddle {
-	return &core.Paddle{IpAddress: ip}
+func generateGameElement(ip string) (*core.Player, *core.Player, *core.Ball) {
+	paddleStart := windowHeight/2 - PaddleHeight/2
+
+	player1 := &core.Player{
+		GameObject: core.GameObject{Row: paddleStart, Col: 0,
+			Width: 1, Height: PaddleHeight,
+			Symbol: PaddleSymbol,
+			VelRow: 0, VelCol: 0,
+		},
+		NickName:     "Player",
+		IpAddress:    ip,
+		CurrentScore: 0,
+		RightOrLeft:  "left",
+	}
+
+	player2 := &core.Player{
+		GameObject: core.GameObject{Row: paddleStart, Col: windowWidth - 2, Width: 1,
+			Height: PaddleHeight, Symbol: PaddleSymbol,
+			VelRow: 0, VelCol: 0},
+		NickName:     "Player two",
+		IpAddress:    ip,
+		CurrentScore: 0,
+		RightOrLeft:  "right",
+	}
+
+	ball := &core.Ball{
+		GameObject: core.GameObject{Row: windowHeight / 2, Col: windowWidth / 2, Width: 1, Height: 1, Symbol: BallSymbol,
+			VelRow: BallVelocityRow, VelCol: BallVelocityCol},
+	}
+
+	return player1, player2, ball
 }
 
-func startOnline() {
+func startOnline(room *Room) {
 	fmt.Println("遊戲開始！！！")
-	initGameState()
-	startService()
+	startService(room)
 }
 
 func main() {
 	waitingPlayer()
 }
 
+/*
 func monitorConnectionStatus(conn net.Conn) {
 	defer conn.Close()
 	notify := make(chan error)
@@ -301,5 +330,5 @@ func monitorConnectionStatus(conn net.Conn) {
 			break
 		}
 	}
-
 }
+*/

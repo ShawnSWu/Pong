@@ -1,7 +1,7 @@
-package mains
+package client
 
 import (
-	"Pong/core"
+	"Pong/server/core"
 	"fmt"
 	"github.com/gdamore/tcell"
 	"os"
@@ -10,8 +10,8 @@ import (
 )
 
 var screen tcell.Screen
-var player1 *core.Paddle
-var player2 *core.Paddle
+var player1 *core.Player
+var player2 *core.Player
 var ball *core.Ball
 
 const FinalScore = 9        // 遊戲結束分數
@@ -91,7 +91,7 @@ func initGameState() {
 	width, height := screen.Size()
 	paddleStart := height/2 - PaddleHeight/2
 
-	player1 = &core.Paddle{
+	player1 = &core.Player{
 		GameObject: core.GameObject{Row: paddleStart, Col: 0, Width: 1,
 			Height: PaddleHeight, Symbol: PaddleSymbol,
 			VelRow: 0, VelCol: 0},
@@ -99,7 +99,7 @@ func initGameState() {
 		CurrentScore: 0,
 	}
 
-	player2 = &core.Paddle{
+	player2 = &core.Player{
 		GameObject: core.GameObject{Row: paddleStart, Col: width - 2, Width: 1,
 			Height: PaddleHeight, Symbol: PaddleSymbol,
 			VelRow: 0, VelCol: 0},
@@ -149,7 +149,7 @@ func resetNewRound(ball *core.Ball) {
 	ball.Col = width / 2
 }
 
-func isGameOver() (bool, *core.Paddle) {
+func isGameOver() (bool, *core.Player) {
 	if player1.CurrentScore == FinalScore {
 		return true, player1
 	}
@@ -185,12 +185,12 @@ func isTouchPaddle(ball *core.Ball) bool {
 	return false
 }
 
-func isTouchBottomBorder(paddle *core.Paddle) bool {
+func isTouchBottomBorder(paddle *core.Player) bool {
 	_, screenHeight := screen.Size()
 	return (paddle.Row + paddle.Height) < screenHeight
 }
 
-func isTouchTopBorder(paddle *core.Paddle) bool {
+func isTouchTopBorder(paddle *core.Player) bool {
 	return paddle.Row > 0
 }
 
