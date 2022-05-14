@@ -1,5 +1,12 @@
 package main
 
+import (
+	"Pong/core"
+	"Pong/logger"
+)
+
 func main() {
-	gameStart()
+	logger.Log.Init()
+	logger.Log.Info("Server launching..")
+	core.Start()
 }
