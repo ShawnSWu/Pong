@@ -5,7 +5,9 @@ import (
 )
 
 type Room struct {
-	RoomId string
+	RoomId     string
+	Name       string
+	GameStatus string
 
 	Player1 *Player
 	Player2 *Player

@@ -7,5 +7,6 @@ import (
 
 func main() {
 	logger.Log.Init()
+	logger.Log.Info("Server launching..")
 	core.Start()
 }

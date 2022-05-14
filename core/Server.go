@@ -7,8 +7,18 @@ import (
 	"github.com/google/uuid"
 	"net"
 	"os"
+	"strings"
 	"time"
 )
+
+const PayloadTerminator = "."
+
+const GameStatusWaiting = "Waiting"
+const GameStatusPlaying = "Playing"
+const ConnBrokenStatus = "CB"
+
+const ConnWorking = 1
+const ConnBroken = 0
 
 const FinalScore = 9        // 遊戲結束分數
 const BallSymbol = 0x25CF   // 球符號
@@ -22,11 +32,14 @@ const windowWidth = 150
 
 const MaxRoomCount = 10
 
-//大廳玩家
+//大廳玩家的連線
 var lobbyPlayer = make(map[string]*net.Conn)
 
 //最多同時10間房間
 var lobbyRoom = make([]*Room, 0, 10)
+
+//Room跟main goroutine的溝通channel
+var roomChanMsg = make(chan string)
 
 func updateState(room *Room) {
 	player1 := room.Player1
@@ -136,7 +149,7 @@ func readClientInput(room *Room, connP *net.Conn, player *Player) {
 	}
 }
 
-func startService(room *Room) {
+func roomGameStart(room *Room) {
 
 	player1 := room.Player1
 	player2 := room.Player2
@@ -148,32 +161,55 @@ func startService(room *Room) {
 
 	for {
 		updateState(room)
-		sendToClient(room, conn1)
-		sendToClient(room, conn2)
+		conn1SendStatus := sendGameState(conn1, room)
+		conn2SendStatus := sendGameState(conn2, room)
+
+		if conn1SendStatus == ConnBroken || conn2SendStatus == ConnBroken {
+			return
+		}
 		time.Sleep(65 * time.Millisecond)
 	}
 }
 
-func sendToClient(room *Room, connP *net.Conn) {
+func sendMsg(connP *net.Conn, payload string) int {
+	conn := *connP
+
+	logger.Log.Info(fmt.Sprintf(sendMsgContent, conn.RemoteAddr().String(), payload))
+	_, err := conn.Write([]byte(payload))
+
+	//斷線了 傳訊息給main goroutine
+	if err != nil {
+		//CB mean connection broken
+		roomChanMsg <- fmt.Sprintf("%s_%s%s", ConnBrokenStatus, ConnBrokenMsg, PayloadTerminator)
+		logger.Log.Error(ConnBrokenMsg + " => " + fmt.Sprintf("%s_%s", ConnBrokenStatus, ConnBrokenMsg))
+		return ConnBroken
+	}
+	return ConnWorking
+}
+
+func sendGameState(connP *net.Conn, room *Room) int {
+	conn := *connP
 	player1 := room.Player1
 	player2 := room.Player2
 	ball := room.Ball
 
-	ballX := ball.Col
-	ballY := ball.Row
-	player1X := player1.Col
-	player1Y := player1.Row
-	player1Score := player1.CurrentScore
-	player2X := player2.Col
-	player2Y := player2.Row
-	player2Score := player2.CurrentScore
+	ballX, ballY := ball.Col, ball.Row
+	player1X, player1Y, player1Score := player1.Col, player1.Row, player1.CurrentScore
+	player2X, player2Y, player2Score := player2.Col, player2.Row, player2.CurrentScore
 
 	//ballX, ballY, player1X, player1Y,player1Score, player2X, player2Y,player2Score
-	payload := fmt.Sprintf("%d,%d,%d,%d,%d,%d,%d,%d.", ballX, ballY,
-		player1X, player1Y, player1Score, player2X, player2Y, player2Score)
-	fmt.Println(payload)
-	conn := *connP
-	conn.Write([]byte(payload))
+	payload := fmt.Sprintf("%d,%d,%d,%d,%d,%d,%d,%d%s", ballX, ballY,
+		player1X, player1Y, player1Score, player2X, player2Y, player2Score, PayloadTerminator)
+
+	_, err := conn.Write([]byte(payload))
+
+	//斷線了 通知main goroutine
+	if err != nil {
+		//CB mean connection broken
+		roomChanMsg <- fmt.Sprintf("%s_%s_%s", ConnBrokenStatus, room.RoomId, conn.RemoteAddr().String())
+		return ConnBroken
+	}
+	return ConnWorking
 }
 
 func handleInput(room *Room, userCommand string, player *Player) {
@@ -213,8 +249,10 @@ func waitingPlayer() {
 	tcpAddr, _ := net.ResolveTCPAddr("tcp4", "127.0.0.1:4321")
 	listener, _ := net.ListenTCP("tcp", tcpAddr)
 
+	go listenRoomChannel()
+
 	for {
-		logger.Log.Info("Server launch 等待連線...")
+		logger.Log.Info("等待新玩家連線...")
 
 		conn, _ := listener.Accept()
 		ip := conn.RemoteAddr().String()
@@ -249,6 +287,8 @@ func waitingPlayer() {
 				RoomId:      uuid.New().String(),
 				Player1:     player1,
 				Player2:     player2,
+				Name:        fmt.Sprintf("New Room %d", len(lobbyRoom)),
+				GameStatus:  GameStatusWaiting,
 				Ball:        ball,
 				Player1Conn: tempList[0],
 				Player2Conn: tempList[1],
@@ -263,6 +303,55 @@ func waitingPlayer() {
 		}
 		time.Sleep(10 * time.Millisecond)
 	}
+}
+
+func listenRoomChannel() {
+	for {
+		select {
+		case msg := <-roomChanMsg:
+
+			if strings.HasPrefix(msg, ConnBrokenStatus) {
+				split := strings.Split(msg, "_")
+				roomId := split[1]
+				//斷線者的ip
+				connBrokenIp := split[2]
+
+				//通知另一方對手已斷線
+				room := findRoomById(roomId)
+
+				//有人斷線 刪除大廳中房間
+				lobbyRoom = removeRoom(lobbyRoom, roomId)
+
+				if room.Player1.IpAddress == connBrokenIp {
+					sendMsg(room.Player2Conn, CompetitorConnBrokenMsg)
+				} else {
+					sendMsg(room.Player1Conn, CompetitorConnBrokenMsg)
+				}
+			}
+		}
+	}
+}
+
+func findRoomById(id string) *Room {
+	var targetIndex int
+	for i, room := range lobbyRoom {
+		if room.RoomId == id {
+			targetIndex = i
+			break
+		}
+	}
+	return lobbyRoom[targetIndex]
+}
+
+func removeRoom(rooms []*Room, roomId string) []*Room {
+	var index int
+	for i, v := range rooms {
+		if v.RoomId == roomId {
+			index = i
+			break
+		}
+	}
+	return append(rooms[:index], rooms[index+1:]...)
 }
 
 func generateGameElement(ip string) (*Player, *Player, *Ball) {
@@ -300,51 +389,9 @@ func generateGameElement(ip string) (*Player, *Player, *Ball) {
 
 func startOnline(room *Room) {
 	logger.Log.Info(fmt.Sprintf("Room id:%s 遊戲開始！", room.RoomId))
-	startService(room)
+	roomGameStart(room)
 }
 
 func Start() {
 	waitingPlayer()
 }
-
-/*
-func monitorConnectionStatus(conn net.Conn) {
-	defer conn.Close()
-	notify := make(chan error)
-	go func() {
-		buf := make([]byte, 1024)
-		for {
-			n, err := conn.Read(buf)
-			if err != nil {
-				notify <- err
-				return
-			}
-			if n > 0 {
-				fmt.Println("unexpected data: %s", buf[:n])
-			}
-		}
-	}()
-	connectAlive := true
-
-	for {
-		select {
-		case err := <-notify:
-			if io.EOF == err {
-				ip := conn.RemoteAddr().String()
-				fmt.Println(fmt.Sprintf("%s斷線,", ip), err)
-				delete(paddles, ip)
-				fmt.Println("目前人數:", len(paddles))
-				connectAlive = false
-				break
-			}
-		case <-time.After(time.Second * 1):
-			cm := fmt.Sprintf("%s, still alive", conn.RemoteAddr().String())
-			fmt.Println(cm)
-		}
-
-		if connectAlive == false {
-			break
-		}
-	}
-}
-*/
