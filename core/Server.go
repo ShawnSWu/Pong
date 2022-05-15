@@ -4,14 +4,13 @@ import (
 	"Pong/logger"
 	"bufio"
 	"fmt"
-	"github.com/google/uuid"
 	"net"
 	"os"
 	"strings"
 	"time"
 )
 
-const PayloadTerminator = "."
+const PayloadTerminator = "~"
 
 const GameStatusWaiting = "Waiting"
 const GameStatusPlaying = "Playing"
@@ -206,7 +205,7 @@ func sendGameState(connP *net.Conn, room *Room) int {
 	//斷線了 通知main goroutine
 	if err != nil {
 		//CB mean connection broken
-		roomChanMsg <- fmt.Sprintf("%s_%s_%s", ConnBrokenStatus, room.RoomId, conn.RemoteAddr().String())
+		roomChanMsg <- fmt.Sprintf("%s_%s_%s%s", ConnBrokenStatus, room.RoomId, conn.RemoteAddr().String(), PayloadTerminator)
 		return ConnBroken
 	}
 	return ConnWorking
@@ -244,7 +243,7 @@ func handleInput(room *Room, userCommand string, player *Player) {
 	}
 }
 
-func waitingPlayer() {
+func StartService() {
 
 	tcpAddr, _ := net.ResolveTCPAddr("tcp4", "127.0.0.1:4321")
 	listener, _ := net.ListenTCP("tcp", tcpAddr)
@@ -271,37 +270,53 @@ func waitingPlayer() {
 			logger.Log.Info(fmt.Sprintf("Player ip:%s 進入大廳", ip))
 		}
 
-		if len(lobbyPlayer) < 2 {
-			continue
-		}
+		//產生遊戲大廳的Room列表
+		roomInfoPayload := generateRoomInfoPayload()
+		//傳送遊戲大廳列表給所有玩家
+		notifyAllPlayer(roomInfoPayload)
+		logger.Log.Info("All- " + roomInfoPayload)
 
-		if len(lobbyPlayer) == 2 {
-			player1, player2, ball := generateGameElement(ip)
-
-			var tempList []*net.Conn
-			for _, v := range lobbyPlayer {
-				tempList = append(tempList, v)
-			}
-
-			room := &Room{
-				RoomId:      uuid.New().String(),
-				Player1:     player1,
-				Player2:     player2,
-				Name:        fmt.Sprintf("New Room %d", len(lobbyRoom)),
-				GameStatus:  GameStatusWaiting,
-				Ball:        ball,
-				Player1Conn: tempList[0],
-				Player2Conn: tempList[1],
-			}
-
-			go startOnline(room)
-
-			lobbyRoom = append(lobbyRoom, room)
-
-			//開始遊戲後移除LobbyPlayer等待下一波玩家
-			lobbyPlayer = make(map[string]*net.Conn)
-		}
+		//暫時註解，這裡是Room創建後的邏輯
+		//if len(lobbyPlayer) < 2 {
+		//	continue
+		//}
+		//
+		//if len(lobbyPlayer) == 2 {
+		//	player1, player2, ball := generateGameElement(ip)
+		//
+		//	var tempList []*net.Conn
+		//	for _, v := range lobbyPlayer {
+		//		tempList = append(tempList, v)
+		//	}
+		//
+		//	now := time.Now()
+		//
+		//	room := &Room{
+		//		RoomId:      uuid.New().String(),
+		//		Player1:     player1,
+		//		Player2:     player2,
+		//		Name:        fmt.Sprintf("New Room %d", len(lobbyRoom)),
+		//		GameStatus:  GameStatusWaiting,
+		//		CreateDate:  now.Format("2006-02-01 15:01"),
+		//		Ball:        ball,
+		//		Player1Conn: tempList[0],
+		//		Player2Conn: tempList[1],
+		//	}
+		//
+		//	go startOnline(room)
+		//
+		//	lobbyRoom = append(lobbyRoom, room)
+		//
+		//	//開始遊戲後移除LobbyPlayer等待下一波玩家
+		//	lobbyPlayer = make(map[string]*net.Conn)
+		//}
 		time.Sleep(10 * time.Millisecond)
+	}
+}
+
+func notifyAllPlayer(roomInfoPayload string) {
+	for _, playerConn := range lobbyPlayer {
+		sendMsg(playerConn, roomInfoPayload)
 	}
 }
 
@@ -316,16 +331,22 @@ func listenRoomChannel() {
 				//斷線者的ip
 				connBrokenIp := split[2]
 
-				//通知另一方對手已斷線
 				room := findRoomById(roomId)
 
 				//有人斷線 刪除大廳中房間
 				lobbyRoom = removeRoom(lobbyRoom, roomId)
 
+				//通知另一方對手已斷線
 				if room.Player1.IpAddress == connBrokenIp {
-					sendMsg(room.Player2Conn, CompetitorConnBrokenMsg)
+					m := fmt.Sprintf("%s_%s_%s%s", ConnBrokenStatus, room.RoomId, room.Player1.IpAddress, PayloadTerminator)
+
+					sendMsg(room.Player2Conn, m)
+					delete(lobbyPlayer, room.Player2.IpAddress)
 				} else {
-					sendMsg(room.Player1Conn, CompetitorConnBrokenMsg)
+					m := fmt.Sprintf("%s_%s_%s%s", ConnBrokenStatus, room.RoomId, room.Player2.IpAddress, PayloadTerminator)
+
+					sendMsg(room.Player1Conn, m)
+					delete(lobbyPlayer, room.Player1.IpAddress)
 				}
 			}
 		}
@@ -392,6 +413,43 @@ func startOnline(room *Room) {
 	roomGameStart(room)
 }
 
-func Start() {
-	waitingPlayer()
+type RoomInfo struct {
+	roomName    string
+	createDate  string
+	playerCount int
+}
+
+func getRoomList() []RoomInfo {
+	var roomInfoSlice = make([]RoomInfo, 0, 10)
+
+	for i := 0; i < len(lobbyRoom); i++ {
+		roomName := lobbyRoom[i].Name
+		createDate := lobbyRoom[i].CreateDate
+
+		playerCount := 0
+		if lobbyRoom[i].Player1Conn != nil {
+			playerCount += 1
+		}
+		if lobbyRoom[i].Player2Conn != nil {
+			playerCount += 1
+		}
+
+		roomInfoSlice = append(roomInfoSlice, RoomInfo{roomName, createDate, playerCount})
+	}
+
+	return roomInfoSlice
+}
+
+func generateRoomInfoPayload() string {
+	riList := getRoomList()
+	var payload string
+	for i := 0; i < len(riList); i += 1 {
+		rn := riList[i].roomName
+		cd := riList[i].createDate
+		pc := riList[i].playerCount
+
+		payload = fmt.Sprintf("%s+%s+%d&", rn, cd, pc)
+	}
+
+	return payload + PayloadTerminator
 }
