@@ -1,5 +1,7 @@
 package core
 
+import "net"
+
 type GameObject struct {
 	Row, Col       int
 	Width, Height  int
@@ -17,6 +19,8 @@ type Player struct {
 	CurrentScore int
 	IpAddress    string
 	RightOrLeft  string
+
+	Conn *net.Conn
 }
 
 func (p *Player) MoveUp() {
