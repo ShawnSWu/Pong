@@ -20,6 +20,8 @@ type Player struct {
 	IpAddress    string
 	RightOrLeft  string
 
+	Scene string
+
 	Conn *net.Conn
 }
 

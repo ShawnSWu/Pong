@@ -1,5 +1,8 @@
 package core
 
+const GameStatusWaiting = "Waiting"
+const GameStatusPlaying = "Playing"
+
 type Room struct {
 	RoomId     string
 	Name       string
