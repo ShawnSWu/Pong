@@ -4,9 +4,10 @@ import (
 	"Pong/logger"
 	"bufio"
 	"fmt"
-	"github.com/google/uuid"
 	"net"
 	"os"
+	"strconv"
+	"sync"
 	"time"
 )
 
@@ -31,8 +32,10 @@ const MaxRoomCount = 10
 
 var RoomInitialId = 0
 
+var mutex sync.RWMutex
+
 //大廳玩家的連線
-var lobbyPlayer = make(map[string]*net.Conn)
+var lobbyPlayer = make(map[string]*Player)
 
 //最多同時6間房間
 var lobbyRoom = make([]*Room, 0, 6)
@@ -155,6 +158,11 @@ func listenPlayerOperation(connP *net.Conn, player *Player) {
 
 	for {
 		payload, _ := bufio.NewReader(conn).ReadString('~')
+
+		if payload == "" {
+			continue
+		}
+
 		header := string([]byte(payload)[0:2])
 		payload = removeHeaderTerminator(payload)
 
@@ -164,23 +172,45 @@ func listenPlayerOperation(connP *net.Conn, player *Player) {
 
 			switch header {
 			case CreateRoom:
-				//TODO 定義創建房間封包
+				logger.Log.Info("創建新房間！")
+				roomName := parseCreateRoom(payload)
 				r := &Room{
-					RoomId:     uuid.New().String(),
-					Name:       fmt.Sprintf("New Room %d", len(lobbyRoom)),
+					RoomId:     generateRoomId(),
+					Name:       roomName,
 					GameStatus: GameStatusWaiting,
 					CreateDate: time.Now().Format("2006-02-01 15:01"),
 				}
+
+				mutex.Lock()
 				lobbyRoom = append(lobbyRoom, r)
+				mutex.Unlock()
+
+				//通知所有『在大廳』的玩家
+				roomInfoPayload := generateRoomsInfoPayload()
+				notifyPlayerByScene(roomInfoPayload, SceneLobby)
 				break
 
 			case EnterRoom:
-				//TODO 定義進入房間封包
+				//把玩家加到房間資訊中(更新房間資訊) 並更改玩家場景
+				playerId := conn.RemoteAddr().String()
+				roomId := parseEnterRoom(payload)
 
+				player := lobbyPlayer[playerId]
+				room := findRoomById(roomId)
+
+				if len(room.players) < 2 {
+					room.players = append(room.players, player)
+				}
+
+				//TODO
+				// 通知所有在『大廳』的玩家 RoomInfo
+				// 通知在『房間中』的玩家 Room (如果房間本身沒人 則不通知)
 				break
 
 			case LeaveLobby:
-				//TODO 定義離開大廳封包
+				//TODO
+				// 通知所有在『大廳』的玩家 RoomInfo
+				// 通知在『房間中』的玩家 Room (如果離開後沒人 則不通知)
 				break
 			}
 			break
@@ -190,10 +220,12 @@ func listenPlayerOperation(connP *net.Conn, player *Player) {
 			switch header {
 			case LeaveRoom:
 				//TODO 定義離開房間封包
+				//(更新房間資訊) 並更改玩家場景
 				break
 
 			case ReadyStart:
 				//TODO 定義準備開始遊戲封包
+				//(更新房間資訊) 並更改房間遊戲狀態(GameStatus)
 				break
 			}
 
@@ -239,16 +271,16 @@ func roomGameStart(room *Room) {
 	}
 }
 
-func sendMsg(connP *net.Conn, payload string) int {
-	conn := *connP
-
+func sendMsg(player *Player, payload string) int {
+	conn := *player.Conn
+	ip := conn.RemoteAddr().String()
 	logger.Log.Info(fmt.Sprintf(sendMsgContent, conn.RemoteAddr().String(), payload))
 	_, err := conn.Write([]byte(payload))
 
 	//斷線了 傳訊息給main goroutine
 	if err != nil {
 		//CB mean connection broken
-		roomChanMsg <- fmt.Sprintf("%s%s%s", ConnBrokenMsgHeader, conn.RemoteAddr().String(), PayloadTerminator)
+		roomChanMsg <- generateConnBrokenPayload(ip)
 		logger.Log.Error(ConnBrokenMsg + " => " + fmt.Sprintf("%s_%s", ConnBrokenMsgHeader, ConnBrokenMsg))
 		return ConnBroken
 	}
@@ -265,16 +297,15 @@ func sendGameState(connP *net.Conn, room *Room) int {
 	player1X, player1Y, player1Score := player1.Col, player1.Row, player1.CurrentScore
 	player2X, player2Y, player2Score := player2.Col, player2.Row, player2.CurrentScore
 
-	//ballX, ballY, player1X, player1Y,player1Score, player2X, player2Y,player2Score
-	payload := fmt.Sprintf("%s%d,%d,%d,%d,%d,%d,%d,%d%s", BattleSituation, ballX, ballY,
-		player1X, player1Y, player1Score, player2X, player2Y, player2Score, PayloadTerminator)
+	payload := generateBattlePayload(ballX, ballY,
+		player1X, player1Y, player1Score, player2X, player2Y, player2Score)
 
 	_, err := conn.Write([]byte(payload))
 
 	//斷線了 通知main goroutine
 	if err != nil {
 		//CB mean connection broken
-		roomChanMsg <- fmt.Sprintf("%s%s%s", ConnBrokenMsgHeader, conn.RemoteAddr().String(), PayloadTerminator)
+		roomChanMsg <- generateConnBrokenPayload(conn.RemoteAddr().String())
 		return ConnBroken
 	}
 	return ConnWorking
@@ -303,7 +334,7 @@ func handleBattleOperation(userCommand string, player *Player) {
 func StartService() {
 
 	//測試資料
-	insetTestData()
+	//insetTestData()
 
 	tcpAddr, _ := net.ResolveTCPAddr("tcp4", "127.0.0.1:4321")
 	listener, _ := net.ListenTCP("tcp", tcpAddr)
@@ -325,22 +356,21 @@ func StartService() {
 			continue
 		}
 
-		if lobbyPlayer[ip] == nil {
-			lobbyPlayer[ip] = &conn
-			logger.Log.Info(fmt.Sprintf("Player ip:%s 進入大廳", ip))
-		}
-
 		//產生玩家
 		player := generatePlayer(ip, &conn)
+
+		if lobbyPlayer[ip] == nil {
+			lobbyPlayer[ip] = player
+			logger.Log.Info(fmt.Sprintf("Player ip:%s 進入大廳", ip))
+		}
 
 		go listenPlayerOperation(&conn, player)
 
 		//產生遊戲大廳的Room列表
 		roomInfoPayload := generateRoomsInfoPayload()
 
-		//傳送遊戲大廳列表給所有玩家
-		notifyAllPlayer(roomInfoPayload)
-		logger.Log.Info("All- " + roomInfoPayload)
+		//傳送遊戲大廳列表給此新玩家
+		sendMsg(player, roomInfoPayload)
 
 		//暫時註解，這裡是Room創建後的邏輯
 		//if len(lobbyPlayer) < 2 {
@@ -380,9 +410,12 @@ func StartService() {
 	}
 }
 
-func notifyAllPlayer(roomInfoPayload string) {
-	for _, playerConn := range lobbyPlayer {
-		sendMsg(playerConn, roomInfoPayload)
+func notifyPlayerByScene(roomInfoPayload string, scene string) {
+	fmt.Println("房間清單封包：", roomInfoPayload)
+	for _, player := range lobbyPlayer {
+		if player.Scene == scene {
+			sendMsg(player, roomInfoPayload)
+		}
 	}
 }
 
@@ -406,7 +439,7 @@ func listenRoomChannel() {
 
 				//處理完後，通知所有玩家，更新大廳與房間資訊
 				roomsInfo := generateRoomsInfoPayload()
-				notifyAllPlayer(roomsInfo)
+				notifyPlayerByScene(roomsInfo, SceneLobby)
 				logger.Log.Info("已通知所有玩家！")
 				break
 			}
@@ -430,7 +463,7 @@ func getPlayerRoom(playerIp string) *Room {
 	found := false
 	for i, r := range lobbyRoom {
 		for _, player := range r.players {
-			if playerIp == player.IpAddress {
+			if playerIp == player.IdAkaIpAddress {
 				roomIndex = i
 				found = true
 				break
@@ -467,10 +500,10 @@ func removeRoom(rooms []*Room, roomId string) []*Room {
 
 func generatePlayer(ip string, conn *net.Conn) *Player {
 	return &Player{
-		NickName:  "Player",
-		IpAddress: ip,
-		Conn:      conn,
-		Scene:     SceneLobby,
+		NickName:       "Player",
+		IdAkaIpAddress: ip,
+		Conn:           conn,
+		Scene:          SceneLobby,
 	}
 }
 
@@ -483,20 +516,20 @@ func generateGameElement(ip string) (*Player, *Player, *Ball) {
 			Symbol: PaddleSymbol,
 			VelRow: 0, VelCol: 0,
 		},
-		NickName:     "Player",
-		IpAddress:    ip,
-		CurrentScore: 0,
-		RightOrLeft:  "left",
+		NickName:       "Player",
+		IdAkaIpAddress: ip,
+		CurrentScore:   0,
+		RightOrLeft:    "left",
 	}
 
 	player2 := &Player{
 		GameObject: GameObject{Row: paddleStart, Col: windowWidth - 2, Width: 1,
 			Height: PaddleHeight, Symbol: PaddleSymbol,
 			VelRow: 0, VelCol: 0},
-		NickName:     "Player two",
-		IpAddress:    ip,
-		CurrentScore: 0,
-		RightOrLeft:  "right",
+		NickName:       "Player two",
+		IdAkaIpAddress: ip,
+		CurrentScore:   0,
+		RightOrLeft:    "right",
 	}
 
 	ball := &Ball{
@@ -548,16 +581,16 @@ func connBrokenHandle(connBrokenIp string) {
 		player2 := room.players[1]
 
 		//通知另一方對手已斷線
-		if player1.IpAddress == connBrokenIp {
-			msg := generateConnBrokenPayload(player1.IpAddress)
-			sendMsg(player2.Conn, msg)
+		if player1.IdAkaIpAddress == connBrokenIp {
+			msg := generateConnBrokenPayload(player1.IdAkaIpAddress)
+			sendMsg(player2, msg)
 			//刪除房間
-			delete(lobbyPlayer, player2.IpAddress)
+			delete(lobbyPlayer, player2.IdAkaIpAddress)
 		} else {
-			msg := generateConnBrokenPayload(player2.IpAddress)
-			sendMsg(player1.Conn, msg)
+			msg := generateConnBrokenPayload(player2.IdAkaIpAddress)
+			sendMsg(player1, msg)
 			//刪除房間
-			delete(lobbyPlayer, player1.IpAddress)
+			delete(lobbyPlayer, player1.IdAkaIpAddress)
 		}
 	}
 
@@ -565,7 +598,7 @@ func connBrokenHandle(connBrokenIp string) {
 	if room != nil {
 		var toRemoveIndex = 0
 		for i, player := range room.players {
-			if connBrokenIp == player.IpAddress {
+			if connBrokenIp == player.IdAkaIpAddress {
 				toRemoveIndex = i
 				break
 			}
@@ -584,7 +617,7 @@ func insetTestData() {
 
 	var tempList []*net.Conn
 	for _, v := range lobbyPlayer {
-		tempList = append(tempList, v)
+		tempList = append(tempList, v.Conn)
 	}
 
 	players := []*Player{player1, player2}
@@ -600,5 +633,5 @@ func insetTestData() {
 
 func generateRoomId() string {
 	RoomInitialId += 1
-	return string(rune(RoomInitialId))
+	return strconv.Itoa(RoomInitialId)
 }

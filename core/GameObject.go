@@ -15,10 +15,10 @@ type Ball struct {
 
 type Player struct {
 	GameObject
-	NickName     string
-	CurrentScore int
-	IpAddress    string
-	RightOrLeft  string
+	NickName       string
+	CurrentScore   int
+	IdAkaIpAddress string
+	RightOrLeft    string
 
 	Scene string
 
