@@ -1,13 +1,14 @@
 package core
 
-const GameStatusWaiting = "Waiting"
-const GameStatusPlaying = "Playing"
+const RoomStatusWaiting = "Waiting"
+const RoomStatusPlaying = "Playing"
 
 type Room struct {
 	RoomId     string
 	Name       string
-	GameStatus string
+	RoomStatus string
 	CreateDate string
+	Creator    *Player
 
 	players []*Player
 
