@@ -16,7 +16,9 @@ const EnterRoomHeader = "ER"  // Enter Room 進入房間
 const LeaveRoomHeader = "LR"  // Leave Room 離開房間
 const ReadyStartHeader = "RS" // Ready Start 準備開始
 
+const StartBattleHeader = "SB"     // Battle status 遊戲中的狀態
 const BattleSituationHeader = "BS" // Battle status 遊戲中的狀態
+const BattleOperationHeader = "BO" // Battle status 遊戲中玩家的操作
 
 func generateRoomsListPayload() string {
 	riList := getRoomList()
@@ -26,8 +28,9 @@ func generateRoomsListPayload() string {
 		rn := riList[i].roomName
 		cd := riList[i].createDate
 		pc := riList[i].playerCount
+		rs := riList[i].RoomStatus
 
-		payload += fmt.Sprintf("%s,%s,%s,%d", ri, rn, cd, pc)
+		payload += fmt.Sprintf("%s,%s,%s,%d,%d", ri, rn, cd, pc, rs)
 
 		if i != len(riList)-1 {
 			payload += "&"
@@ -90,11 +93,8 @@ func generateConnBrokenPayload(brokenIp string) string {
 	return fmt.Sprintf("%s%s%s", ConnBrokenHeader, brokenIp, PayloadTerminator)
 }
 
-func parseEnterRoomPayload(payload string) string {
-
-	// ER_{RoomId}_player
-
-	return ""
+func generateStartBattlePayload(roomId string) string {
+	return fmt.Sprintf("%s%s%s", StartBattleHeader, roomId, PayloadTerminator)
 }
 
 func removeHeaderTerminator(payload string) string {
@@ -108,4 +108,9 @@ func generateBattlePayload(ballX, ballY,
 	payload := fmt.Sprintf("%d,%d,%d,%d,%d,%d,%d,%d", ballX, ballY,
 		player1X, player1Y, player1Score, player2X, player2Y, player2Score)
 	return BattleSituationHeader + payload + PayloadTerminator
+}
+
+func parsePlayerBattleOperation(payload string) string {
+	battleOperation := payload
+	return battleOperation
 }
