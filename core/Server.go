@@ -102,7 +102,7 @@ func listenPlayerOperation(connP *net.Conn, player *Player) {
 
 				//修改Player Scene
 				mutex.Lock()
-				player.Scene = SceneRoom
+				player.SetScene(SceneRoom)
 				room.players = append(room.players, player)
 				mutex.Unlock()
 
@@ -144,7 +144,7 @@ func listenPlayerOperation(connP *net.Conn, player *Player) {
 				//移除Room中的此玩家
 				removeRoomPlayer(room, playerId)
 				//更改玩家場景狀態
-				player.Scene = SceneLobby
+				player.SetScene(SceneLobby)
 				mutex.Unlock()
 
 				//通知大廳玩家(更新房間List)
@@ -192,6 +192,12 @@ func listenPlayerOperation(connP *net.Conn, player *Player) {
 			case BattleOperationHeader:
 				battleOperation := parsePlayerBattleOperation(payload)
 				handleBattleOperation(battleOperation, player)
+				break
+
+			case InterruptBattleHeader:
+				roomId, _ := parseInterruptBattle(payload)
+				playerId := conn.RemoteAddr().String()
+				roomChanMsg <- generateInterruptBattle(roomId, playerId)
 				break
 			}
 			time.Sleep(10 * time.Millisecond)
@@ -319,7 +325,6 @@ func notifyRoomPlayer(room *Room, payload string) {
 			sendMsg(player, payload)
 		}
 	}
-
 }
 
 func listenRoomChannel() {
@@ -357,6 +362,38 @@ func listenRoomChannel() {
 				notifyLobbyPlayerUpdateRoomList()
 
 				go room.startGame()
+				break
+
+				//TODO 玩家斷線時 對手應該要收到通知且獲得RD訊息
+			case InterruptBattleHeader:
+				payload := removeHeaderTerminator(msg) //移除Header與終止符
+				roomId, playerId := parseInterruptBattle(payload)
+
+				room := findRoomById(roomId)
+
+				//移除房間內此玩家
+				room.removeRoomPlayer(playerId)
+
+				//改變房間狀態 Waiting
+				room.updateRoomStatus(RoomStatusWaiting)
+
+				//剩下來的玩家
+				anotherPlayer := room.players[0]
+
+				//修改另一個玩家Scene
+				anotherPlayer.SetScene(SceneRoom)
+
+				//通知另個玩家並讓此玩家回到房間內等待
+				payload = generateInterruptBattle(room.RoomId, anotherPlayer.IdAkaIpAddress)
+
+				//通知另個玩家對方已離線
+				notifyRoomPlayer(room, anotherPlayer.IdAkaIpAddress)
+
+				//讓玩家回到房間時，獲得當前房間狀態
+				detailPayload := generateRoomsDetailPayload(*room)
+				notifyRoomPlayer(room, detailPayload)
+
+				logger.Log.Info(fmt.Sprintf(logger.CompetitorConnBrokenMsg, playerId))
 				break
 			}
 

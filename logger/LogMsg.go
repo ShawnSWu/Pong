@@ -1,6 +1,6 @@
 package logger
 
-const CompetitorConnBrokenMsg = "對方已經離線！"
+const CompetitorConnBrokenMsg = "玩家 %s 已經離線！"
 const ConnBrokenMsg = "連線已斷開！"
 
 const SendMsgContentMsg = "將傳送資料給 ip: %s, content: %s"

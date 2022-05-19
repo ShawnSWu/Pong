@@ -46,7 +46,11 @@ func (r *Room) startGame() {
 	r.spawnGameElement()
 
 	for {
-		r.updateState()
+		//檢查房間狀態(是否有人離線)
+		state := r.updateState()
+		if state == false {
+			return
+		}
 		conn1SendStatus := sendGameState(player1.Conn, r)
 		conn2SendStatus := sendGameState(player2.Conn, r)
 
@@ -93,7 +97,10 @@ func (r *Room) spawnGameElement() {
 	r.Ball = ball
 }
 
-func (r *Room) updateState() {
+func (r *Room) updateState() bool {
+	if len(r.players) < 2 {
+		return false
+	}
 	player1 := r.players[0]
 	player2 := r.players[1]
 	ball := r.Ball
@@ -127,6 +134,8 @@ func (r *Room) updateState() {
 	if over {
 		os.Exit(0)
 	}
+
+	return true
 }
 
 func (r *Room) resetNewRound() {
@@ -209,6 +218,17 @@ func (r *Room) updatePlayerReadyStatus(playerId string) {
 func (r *Room) updateRoomStatus(roomStatus int) {
 	//修改房間狀態
 	r.RoomStatus = roomStatus
+}
+
+func (r *Room) removeRoomPlayer(playerId string) {
+	var index int
+	for i, player := range r.players {
+		if player.IdAkaIpAddress == playerId {
+			index = i
+			break
+		}
+	}
+	r.players = append(r.players[:index], r.players[index+1:]...)
 }
 
 func isTouchBottomBorder(paddle *Player) bool {
