@@ -112,7 +112,7 @@ func listenPlayerOperation(connP *net.Conn, player *Player) {
 				// 通知在『房間中』的玩家 Room (如果房間本身沒人 則不會通知)
 				notifyRoomPlayerUpdateRoomDetail(room)
 
-				logger.Log.Info(fmt.Sprintf("%s 進入房間 RoomId: %s", playerId, roomId))
+				logger.Log.Info(fmt.Sprintf(logger.PlayerEnterRoomMsg, playerId, roomId))
 				break
 			//離開大廳
 			case LeaveLobby:
@@ -174,8 +174,6 @@ func listenPlayerOperation(connP *net.Conn, player *Player) {
 					player2 := room.players[1]
 
 					if player1.RoomReadyStatus == 1 && player2.RoomReadyStatus == 1 {
-						//TODO 即將開始遊戲，通知兩個玩家三秒後開始遊戲
-
 						roomChanMsg <- generateStartBattlePayload(roomId)
 					}
 				}
@@ -202,9 +200,7 @@ func listenPlayerOperation(connP *net.Conn, player *Player) {
 			}
 			time.Sleep(10 * time.Millisecond)
 			break
-
 		}
-
 		time.Sleep(10 * time.Millisecond)
 	}
 }
@@ -340,7 +336,7 @@ func listenRoomChannel() {
 				msg = removeHeaderTerminator(msg) //移除Header與終止符
 				//斷線者的ip
 				connBrokenIp := msg
-				logger.Log.Info("有人斷線！")
+				logger.Log.Info("")
 
 				mutex.Lock()
 				//斷線處理機制
@@ -350,7 +346,7 @@ func listenRoomChannel() {
 				//處理完後，通知所有玩家，更新大廳與房間資訊
 				roomsInfo := generateRoomsListPayload()
 				notifyLobbyPlayer(roomsInfo)
-				logger.Log.Info("通知大廳玩家 更新房間資訊！")
+				logger.Log.Info(logger.NotifyLobbyConnBrokenMsg)
 				break
 
 			case StartBattleHeader:
@@ -370,26 +366,19 @@ func listenRoomChannel() {
 
 				room := findRoomById(roomId)
 
-				//移除房間內此玩家
+				//移除房間內此玩家,改變房間狀態 Waiting
 				room.removeRoomPlayer(playerId)
-
-				//改變房間狀態 Waiting
 				room.updateRoomStatus(RoomStatusWaiting)
 
-				//剩下來的玩家
+				//修改剩下來的玩家Scene
 				anotherPlayer := room.players[0]
-
-				//修改另一個玩家Scene
 				anotherPlayer.SetScene(SceneRoom)
 
 				//通知另個玩家並讓此玩家回到房間內等待
 				payload = generateGiveUpBattle(room.RoomId, anotherPlayer.IdAkaIpAddress)
-
-				//通知房間內剩餘玩家有人已離線
 				notifyRoomPlayer(room, payload)
 
 				time.Sleep(30 * time.Millisecond)
-
 				//讓玩家回到房間時，獲得當前房間狀態
 				notifyRoomPlayerUpdateRoomDetail(room)
 
