@@ -194,10 +194,10 @@ func listenPlayerOperation(connP *net.Conn, player *Player) {
 				handleBattleOperation(battleOperation, player)
 				break
 
-			case InterruptBattleHeader:
+			case GiveUpBattleHeader:
 				roomId, _ := parseInterruptBattle(payload)
 				playerId := conn.RemoteAddr().String()
-				roomChanMsg <- generateInterruptBattle(roomId, playerId)
+				roomChanMsg <- generateGiveUpBattle(roomId, playerId)
 				break
 			}
 			time.Sleep(10 * time.Millisecond)
@@ -364,8 +364,7 @@ func listenRoomChannel() {
 				go room.startGame()
 				break
 
-				//TODO 玩家斷線時 對手應該要收到通知且獲得RD訊息
-			case InterruptBattleHeader:
+			case GiveUpBattleHeader:
 				payload := removeHeaderTerminator(msg) //移除Header與終止符
 				roomId, playerId := parseInterruptBattle(payload)
 
@@ -384,14 +383,15 @@ func listenRoomChannel() {
 				anotherPlayer.SetScene(SceneRoom)
 
 				//通知另個玩家並讓此玩家回到房間內等待
-				payload = generateInterruptBattle(room.RoomId, anotherPlayer.IdAkaIpAddress)
+				payload = generateGiveUpBattle(room.RoomId, anotherPlayer.IdAkaIpAddress)
 
-				//通知另個玩家對方已離線
-				notifyRoomPlayer(room, anotherPlayer.IdAkaIpAddress)
+				//通知房間內剩餘玩家有人已離線
+				notifyRoomPlayer(room, payload)
+
+				time.Sleep(30 * time.Millisecond)
 
 				//讓玩家回到房間時，獲得當前房間狀態
-				detailPayload := generateRoomsDetailPayload(*room)
-				notifyRoomPlayer(room, detailPayload)
+				notifyRoomPlayerUpdateRoomDetail(room)
 
 				logger.Log.Info(fmt.Sprintf(logger.CompetitorConnBrokenMsg, playerId))
 				break
