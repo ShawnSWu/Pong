@@ -17,7 +17,7 @@ const SceneBattle = "Battle"
 const ConnWorking = 1
 const ConnBroken = 0
 
-const MaxRoomCount = 6
+const MaxRoomCount = 100
 
 var RoomInitialId = 0
 
@@ -72,7 +72,7 @@ func listenPlayerOperation(connP *net.Conn, player *Player) {
 					Name:       roomName,
 					RoomStatus: RoomStatusWaiting,
 					Creator:    creator,
-					CreateDate: time.Now().Format("2006-02-01 15:01"),
+					CreateDate: time.Now().Format("2006-01-02 15:04"),
 				}
 
 				mutex.Lock()
@@ -350,8 +350,12 @@ func listenRoomChannel() {
 				break
 
 			case StartBattleHeader:
-				msg = removeHeaderTerminator(msg) //移除Header與終止符
-				room := findRoomById(msg)
+				payload := removeHeaderTerminator(msg) //移除Header與終止符
+				room := findRoomById(payload)
+
+				//通知玩家準備開始
+				notifyRoomPlayer(room, msg)
+
 				//倒數三秒
 				time.Sleep(3000 * time.Millisecond)
 				room.updateRoomStatus(RoomStatusPlaying)

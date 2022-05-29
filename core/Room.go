@@ -11,12 +11,12 @@ import (
 const FinalScore = 9        // 遊戲結束分數
 const BallSymbol = 0x25CF   // 球符號
 const PaddleSymbol = 0x2588 // 球拍符號
-const PaddleHeight = 6      // 球拍高度
-const BallVelocityRow = 1
-const BallVelocityCol = 1
+const PaddleHeight = 150    // 球拍高度
+const BallVelocityRow = 10
+const BallVelocityCol = 10
 
-const windowHeight = 60
-const windowWidth = 150
+const windowHeight = 600
+const windowWidth = 800
 
 const RoomStatusWaiting = 0
 const RoomStatusPlaying = 1
@@ -57,7 +57,7 @@ func (r *Room) startGame() {
 		if conn1SendStatus == ConnBroken || conn2SendStatus == ConnBroken {
 			return
 		}
-		time.Sleep(2000 * time.Millisecond)
+		time.Sleep(90 * time.Millisecond)
 	}
 }
 
@@ -79,7 +79,7 @@ func (r *Room) spawnGameElement() {
 	player1.RightOrLeft = "left"
 
 	player2.Row = paddleStart
-	player2.Col = windowWidth - 2
+	player2.Col = windowWidth - 20
 	player2.Width = 1
 	player2.Height = PaddleHeight
 	player2.Symbol = PaddleSymbol
