@@ -23,6 +23,7 @@ const StartBattleHeader = "SB"     // Start battle 開始戰鬥
 const BattleSituationHeader = "BS" // Battle status 戰鬥中的狀態
 const BattleOperationHeader = "BO" // Battle operation 戰鬥中玩家的操作
 const GiveUpBattleHeader = "GB"    // Give up Battle 中斷戰鬥
+const GiveUpByMyselfHeader = "GM"  // Give up by myself 自行發起投降戰鬥
 
 func generateRoomsListPayload() string {
 	riList := getRoomList()
@@ -91,9 +92,13 @@ func generateBattlePayload(ballX, ballY,
 	return BattleSituationHeader + payload + PayloadTerminator
 }
 
-func generateGiveUpBattle(roomId string, interruptSponsor string) string {
+func generateOpponentGiveUpBattle(roomId string, interruptSponsor string) string {
 	payload := fmt.Sprintf("%s,%s", roomId, interruptSponsor)
 	return fmt.Sprintf("%s%s%s", GiveUpBattleHeader, payload, PayloadTerminator)
+}
+
+func generateMyselfGiveUpBattle(roomId string) string {
+	return fmt.Sprintf("%s%s%s", GiveUpByMyselfHeader, roomId, PayloadTerminator)
 }
 
 func parsePlayerBattleOperation(payload string) string {

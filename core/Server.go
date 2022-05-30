@@ -195,7 +195,7 @@ func listenPlayerOperation(connP *net.Conn, player *Player) {
 			case GiveUpBattleHeader:
 				roomId, _ := parseInterruptBattle(payload)
 				playerId := conn.RemoteAddr().String()
-				roomChanMsg <- generateGiveUpBattle(roomId, playerId)
+				roomChanMsg <- generateOpponentGiveUpBattle(roomId, playerId)
 				break
 			}
 			time.Sleep(10 * time.Millisecond)
@@ -370,6 +370,10 @@ func listenRoomChannel() {
 
 				room := findRoomById(roomId)
 
+				//通知該玩家你已放棄此次戰鬥
+				giveUpPayload := generateMyselfGiveUpBattle(roomId)
+				sendMsg(lobbyPlayer[playerId], giveUpPayload)
+
 				//移除房間內此玩家,改變房間狀態 Waiting
 				room.removeRoomPlayer(playerId)
 				room.updateRoomStatus(RoomStatusWaiting)
@@ -379,7 +383,7 @@ func listenRoomChannel() {
 				anotherPlayer.SetScene(SceneRoom)
 
 				//通知另個玩家並讓此玩家回到房間內等待
-				payload = generateGiveUpBattle(room.RoomId, anotherPlayer.IdAkaIpAddress)
+				payload = generateOpponentGiveUpBattle(room.RoomId, anotherPlayer.IdAkaIpAddress)
 				notifyRoomPlayer(room, payload)
 
 				time.Sleep(30 * time.Millisecond)
