@@ -101,6 +101,10 @@ func generateMyselfGiveUpBattle(roomId string) string {
 	return fmt.Sprintf("%s%s%s", GiveUpByMyselfHeader, roomId, PayloadTerminator)
 }
 
+func generateLeaveLobbySuccessPayload() string {
+	return fmt.Sprintf("%s%s", LeaveLobby, PayloadTerminator)
+}
+
 func parsePlayerBattleOperation(payload string) string {
 	battleOperation := payload
 	return battleOperation

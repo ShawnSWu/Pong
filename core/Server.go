@@ -118,6 +118,11 @@ func listenPlayerOperation(connP *net.Conn, player *Player) {
 			case LeaveLobby:
 				playerId := conn.RemoteAddr().String()
 
+				//通知玩家已成功離開大廳
+				player := lobbyPlayer[playerId]
+				payload := generateLeaveLobbySuccessPayload()
+				sendMsg(player, payload)
+
 				mutex.Lock()
 				//關閉連線
 				disconnectPlayerConn(playerId)
@@ -125,6 +130,7 @@ func listenPlayerOperation(connP *net.Conn, player *Player) {
 				mutex.Unlock()
 
 				logger.Log.Info(fmt.Sprintf("%s 離開大廳！", playerId))
+				logger.Log.Info(fmt.Sprintf("當下人數：%d", len(lobbyPlayer)))
 
 				notifyLobbyPlayerUpdateRoomList()
 				break
