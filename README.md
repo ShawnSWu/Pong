@@ -1,12 +1,17 @@
 # It's Pong Game!
-The Pong game remade in terminal with Golang.
+The Online Pong game server with Golang.
+Support multiplayer online
 
-## Game View
+###The Game Download
+ coming soon..
+
+
+### Game View
 
 ![](https://i.imgur.com/yFmyAsU.jpg)
 
-![](https://i.imgur.com/pwHaHtR.gif)
+![](https://i.imgur.com/51AnAF3.jpg)
 
 ![](https://i.imgur.com/hGUjhUs.jpg)
 
-![](https://i.imgur.com/51AnAF3.jpg)
+![](https://i.imgur.com/55KLm0t.gif)
