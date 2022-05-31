@@ -10,4 +10,3 @@ The Pong game remade in terminal with Golang.
 ![](https://i.imgur.com/hGUjhUs.jpg)
 
 ![](https://i.imgur.com/51AnAF3.jpg)
-
