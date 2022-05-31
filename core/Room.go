@@ -4,19 +4,18 @@ import (
 	"Pong/logger"
 	"fmt"
 	"math"
-	"os"
 	"time"
 )
 
-const FinalScore = 9        // 遊戲結束分數
+const FinalScore = 12       // 遊戲結束分數
 const BallSymbol = 0x25CF   // 球符號
 const PaddleSymbol = 0x2588 // 球拍符號
-const PaddleHeight = 6      // 球拍高度
-const BallVelocityRow = 1
-const BallVelocityCol = 1
+const PaddleHeight = 150    // 球拍高度
+const BallVelocityRow = 10
+const BallVelocityCol = 10
 
-const windowHeight = 60
-const windowWidth = 150
+const windowHeight = 600
+const windowWidth = 800
 
 const RoomStatusWaiting = 0
 const RoomStatusPlaying = 1
@@ -46,14 +45,18 @@ func (r *Room) startGame() {
 	r.spawnGameElement()
 
 	for {
-		r.updateState()
+		//檢查房間狀態(是否有人離線)
+		state := r.updateState()
+		if state == false {
+			return
+		}
 		conn1SendStatus := sendGameState(player1.Conn, r)
 		conn2SendStatus := sendGameState(player2.Conn, r)
 
 		if conn1SendStatus == ConnBroken || conn2SendStatus == ConnBroken {
 			return
 		}
-		time.Sleep(2000 * time.Millisecond)
+		time.Sleep(90 * time.Millisecond)
 	}
 }
 
@@ -75,7 +78,7 @@ func (r *Room) spawnGameElement() {
 	player1.RightOrLeft = "left"
 
 	player2.Row = paddleStart
-	player2.Col = windowWidth - 2
+	player2.Col = windowWidth - 20
 	player2.Width = 1
 	player2.Height = PaddleHeight
 	player2.Symbol = PaddleSymbol
@@ -93,7 +96,20 @@ func (r *Room) spawnGameElement() {
 	r.Ball = ball
 }
 
-func (r *Room) updateState() {
+func (r *Room) resetRoomStatus() {
+	player1 := r.players[0]
+	player2 := r.players[1]
+
+	player1.RoomReadyStatus = 0
+	player1.CurrentScore = 0
+	player2.RoomReadyStatus = 0
+	player2.CurrentScore = 0
+}
+
+func (r *Room) updateState() bool {
+	if len(r.players) < 2 {
+		return false
+	}
 	player1 := r.players[0]
 	player2 := r.players[1]
 	ball := r.Ball
@@ -124,9 +140,13 @@ func (r *Room) updateState() {
 	}
 
 	over, _ := r.isGameOver()
-	if over {
-		os.Exit(0)
+	if over == true {
+		msg := generateBattleOver(r.RoomId)
+		roomChanMsg <- msg
+		return false
 	}
+
+	return true
 }
 
 func (r *Room) resetNewRound() {
@@ -209,6 +229,17 @@ func (r *Room) updatePlayerReadyStatus(playerId string) {
 func (r *Room) updateRoomStatus(roomStatus int) {
 	//修改房間狀態
 	r.RoomStatus = roomStatus
+}
+
+func (r *Room) removeRoomPlayer(playerId string) {
+	var index int
+	for i, player := range r.players {
+		if player.IdAkaIpAddress == playerId {
+			index = i
+			break
+		}
+	}
+	r.players = append(r.players[:index], r.players[index+1:]...)
 }
 
 func isTouchBottomBorder(paddle *Player) bool {

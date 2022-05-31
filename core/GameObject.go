@@ -27,10 +27,14 @@ type Player struct {
 	Conn *net.Conn
 }
 
+func (p *Player) SetScene(scene string) {
+	p.Scene = scene
+}
+
 func (p *Player) MoveUp() {
-	p.Row -= 2
+	p.Row -= 50
 }
 
 func (p *Player) MoveDown() {
-	p.Row += 2
+	p.Row += 50
 }

@@ -1,6 +1,9 @@
 package core
 
-import "fmt"
+import (
+	"fmt"
+	"strings"
+)
 
 const PayloadTerminator = "~"
 
@@ -16,9 +19,12 @@ const EnterRoomHeader = "ER"  // Enter Room 進入房間
 const LeaveRoomHeader = "LR"  // Leave Room 離開房間
 const ReadyStartHeader = "RS" // Ready Start 準備開始
 
-const StartBattleHeader = "SB"     // Battle status 遊戲中的狀態
-const BattleSituationHeader = "BS" // Battle status 遊戲中的狀態
-const BattleOperationHeader = "BO" // Battle status 遊戲中玩家的操作
+const StartBattleHeader = "SB"     // Start battle 開始戰鬥
+const BattleSituationHeader = "BS" // Battle status 戰鬥中的狀態
+const BattleActionHeader = "BA"    // Battle operation 戰鬥中玩家的移動操作
+const BattleOverHeader = "BO"      // Battle operation 戰鬥中玩家的操作
+const GiveUpBattleHeader = "GB"    // Give up Battle 中斷戰鬥
+const GiveUpByMyselfHeader = "GM"  // Give up by myself 自行發起投降戰鬥
 
 func generateRoomsListPayload() string {
 	riList := getRoomList()
@@ -71,12 +77,57 @@ func generateRoomsFullPayload(roomId string) string {
 	return RoomFullHeader + roomId + PayloadTerminator
 }
 
+func generateConnBrokenPayload(brokenIp string) string {
+	return fmt.Sprintf("%s%s%s", ConnBrokenHeader, brokenIp, PayloadTerminator)
+}
+
+func generateStartBattlePayload(roomId string) string {
+	return fmt.Sprintf("%s%s%s", StartBattleHeader, roomId, PayloadTerminator)
+}
+
+func generateBattlePayload(ballX, ballY,
+	player1X, player1Y, player1Score,
+	player2X, player2Y, player2Score int) string {
+	payload := fmt.Sprintf("%d,%d,%d,%d,%d,%d,%d,%d", ballX, ballY,
+		player1X, player1Y, player1Score, player2X, player2Y, player2Score)
+	return BattleSituationHeader + payload + PayloadTerminator
+}
+
+func generateOpponentGiveUpBattle(roomId string, interruptSponsor string) string {
+	payload := fmt.Sprintf("%s,%s", roomId, interruptSponsor)
+	return fmt.Sprintf("%s%s%s", GiveUpBattleHeader, payload, PayloadTerminator)
+}
+
+func generateMyselfGiveUpBattle(roomId string) string {
+	return fmt.Sprintf("%s%s%s", GiveUpByMyselfHeader, roomId, PayloadTerminator)
+}
+
+func generateLeaveLobbySuccessPayload() string {
+	return fmt.Sprintf("%s%s", LeaveLobby, PayloadTerminator)
+}
+
+func generateBattleOver(roomId string) string {
+	return fmt.Sprintf("%s%s%s", BattleOverHeader, roomId, PayloadTerminator)
+}
+
+func parseBattleOver(payload string) string {
+	roomId := payload
+	return roomId
+}
+
+func parsePlayerBattleAction(payload string) string {
+	battleOperation := payload
+	return battleOperation
+}
+
 func parseCreateRoom(payload string) string {
-	return payload
+	roomName := payload
+	return roomName
 }
 
 func parseEnterRoom(payload string) string {
-	return payload
+	roomId := payload
+	return roomId
 }
 
 func parseLeaveRoom(payload string) string {
@@ -89,28 +140,13 @@ func parseReadyStart(payload string) string {
 	return roomId
 }
 
-func generateConnBrokenPayload(brokenIp string) string {
-	return fmt.Sprintf("%s%s%s", ConnBrokenHeader, brokenIp, PayloadTerminator)
-}
-
-func generateStartBattlePayload(roomId string) string {
-	return fmt.Sprintf("%s%s%s", StartBattleHeader, roomId, PayloadTerminator)
+func parseInterruptBattle(payload string) (string, string) {
+	split := strings.Split(payload, ",")
+	roomId := split[0]
+	playerId := split[1]
+	return roomId, playerId
 }
 
 func removeHeaderTerminator(payload string) string {
 	return payload[2 : len(payload)-1]
-}
-
-//ballX, ballY, player1X, player1Y,player1Score, player2X, player2Y,player2Score
-func generateBattlePayload(ballX, ballY,
-	player1X, player1Y, player1Score,
-	player2X, player2Y, player2Score int) string {
-	payload := fmt.Sprintf("%d,%d,%d,%d,%d,%d,%d,%d", ballX, ballY,
-		player1X, player1Y, player1Score, player2X, player2Y, player2Score)
-	return BattleSituationHeader + payload + PayloadTerminator
-}
-
-func parsePlayerBattleOperation(payload string) string {
-	battleOperation := payload
-	return battleOperation
 }
