@@ -4,11 +4,10 @@ import (
 	"Pong/logger"
 	"fmt"
 	"math"
-	"os"
 	"time"
 )
 
-const FinalScore = 9        // 遊戲結束分數
+const FinalScore = 3        // 遊戲結束分數
 const BallSymbol = 0x25CF   // 球符號
 const PaddleSymbol = 0x2588 // 球拍符號
 const PaddleHeight = 150    // 球拍高度
@@ -97,6 +96,16 @@ func (r *Room) spawnGameElement() {
 	r.Ball = ball
 }
 
+func (r *Room) resetRoomStatus() {
+	player1 := r.players[0]
+	player2 := r.players[1]
+
+	player1.RoomReadyStatus = 0
+	player1.CurrentScore = 0
+	player2.RoomReadyStatus = 0
+	player2.CurrentScore = 0
+}
+
 func (r *Room) updateState() bool {
 	if len(r.players) < 2 {
 		return false
@@ -131,8 +140,10 @@ func (r *Room) updateState() bool {
 	}
 
 	over, _ := r.isGameOver()
-	if over {
-		os.Exit(0)
+	if over == true {
+		msg := generateBattleOver(r.RoomId)
+		roomChanMsg <- msg
+		return false
 	}
 
 	return true

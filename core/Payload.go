@@ -21,7 +21,8 @@ const ReadyStartHeader = "RS" // Ready Start 準備開始
 
 const StartBattleHeader = "SB"     // Start battle 開始戰鬥
 const BattleSituationHeader = "BS" // Battle status 戰鬥中的狀態
-const BattleOperationHeader = "BO" // Battle operation 戰鬥中玩家的操作
+const BattleActionHeader = "BA"    // Battle operation 戰鬥中玩家的移動操作
+const BattleOverHeader = "BO"      // Battle operation 戰鬥中玩家的操作
 const GiveUpBattleHeader = "GB"    // Give up Battle 中斷戰鬥
 const GiveUpByMyselfHeader = "GM"  // Give up by myself 自行發起投降戰鬥
 
@@ -105,7 +106,16 @@ func generateLeaveLobbySuccessPayload() string {
 	return fmt.Sprintf("%s%s", LeaveLobby, PayloadTerminator)
 }
 
-func parsePlayerBattleOperation(payload string) string {
+func generateBattleOver(roomId string) string {
+	return fmt.Sprintf("%s%s%s", BattleOverHeader, roomId, PayloadTerminator)
+}
+
+func parseBattleOver(payload string) string {
+	roomId := payload
+	return roomId
+}
+
+func parsePlayerBattleAction(payload string) string {
 	battleOperation := payload
 	return battleOperation
 }

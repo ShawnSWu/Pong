@@ -29,7 +29,7 @@ var lobbyPlayer = make(map[string]*Player)
 //最多同時6間房間
 var lobbyRoom = make([]*Room, 0, MaxRoomCount)
 
-//Room跟main goroutine的溝通channel
+// roomChanMsg Room跟main goroutine的溝通channel
 var roomChanMsg = make(chan string)
 
 func notifyLobbyPlayerUpdateRoomList() {
@@ -39,6 +39,11 @@ func notifyLobbyPlayerUpdateRoomList() {
 
 func notifyRoomPlayerUpdateRoomDetail(room *Room) {
 	detailPayload := generateRoomsDetailPayload(*room)
+	notifyRoomPlayer(room, detailPayload)
+}
+
+func notifyRoomPlayerBattleOver(room *Room) {
+	detailPayload := generateBattleOver(room.RoomId)
 	notifyRoomPlayer(room, detailPayload)
 }
 
@@ -76,14 +81,22 @@ func listenPlayerOperation(connP *net.Conn, player *Player) {
 				}
 
 				mutex.Lock()
+				// 將此創建房間的玩家加入到房間中
+				r.players = append(r.players, creator)
+				creator.SetScene(SceneRoom)
+
 				lobbyRoom = append(lobbyRoom, r)
 				mutex.Unlock()
+
+				// 傳送房間資訊該房間創建者
+				notifyRoomPlayerUpdateRoomDetail(r)
 
 				logger.Log.Info(fmt.Sprintf("%s 創建新房間！", playerId))
 
 				//通知所有『在大廳』的玩家
 				notifyLobbyPlayerUpdateRoomList()
 				break
+
 			//進入房間
 			case EnterRoomHeader:
 				//把玩家加到房間資訊中(更新房間資訊) 並更改玩家場景
@@ -193,9 +206,9 @@ func listenPlayerOperation(connP *net.Conn, player *Player) {
 			//戰鬥中的操作(e.g.移動與終止遊戲)
 			switch header {
 
-			case BattleOperationHeader:
-				battleOperation := parsePlayerBattleOperation(payload)
-				handleBattleOperation(battleOperation, player)
+			case BattleActionHeader:
+				battleAction := parsePlayerBattleAction(payload)
+				handleBattleOperation(battleAction, player)
 				break
 
 			case GiveUpBattleHeader:
@@ -207,6 +220,7 @@ func listenPlayerOperation(connP *net.Conn, player *Player) {
 			time.Sleep(10 * time.Millisecond)
 			break
 		}
+		fmt.Println(payload)
 		time.Sleep(10 * time.Millisecond)
 	}
 }
@@ -398,6 +412,18 @@ func listenRoomChannel() {
 
 				logger.Log.Info(fmt.Sprintf(logger.CompetitorConnBrokenMsg, playerId))
 				break
+
+			case BattleOverHeader:
+
+				roomId := parseBattleOver(msg)
+				room := findRoomById(roomId)
+				room.resetRoomStatus()
+
+				updateRoomPlayerScene(room, SceneRoom)
+
+				//通知玩家遊戲結束
+				notifyRoomPlayerUpdateRoomDetail(room)
+				notifyRoomPlayerBattleOver(room)
 			}
 
 		}
@@ -452,6 +478,12 @@ func removeRoom(rooms []*Room, roomId string) []*Room {
 		}
 	}
 	return append(rooms[:index], rooms[index+1:]...)
+}
+
+func updateRoomPlayerScene(room *Room, scene string) {
+	for i, _ := range room.players {
+		room.players[i].SetScene(scene)
+	}
 }
 
 func removeRoomPlayer(room *Room, playerId string) {
