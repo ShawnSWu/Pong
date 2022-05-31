@@ -7,7 +7,7 @@ import (
 	"time"
 )
 
-const FinalScore = 3        // 遊戲結束分數
+const FinalScore = 12       // 遊戲結束分數
 const BallSymbol = 0x25CF   // 球符號
 const PaddleSymbol = 0x2588 // 球拍符號
 const PaddleHeight = 150    // 球拍高度
