@@ -162,6 +162,12 @@ func listenPlayerOperation(connP *net.Conn, player *Player) {
 				mutex.Lock()
 				//移除Room中的此玩家
 				removeRoomPlayer(room, playerId)
+
+				//當房間沒人時 移除空房間
+				if isRoomEmpty(room) {
+					roomIndex := getRoomIndex(room)
+					lobbyRoom = append(lobbyRoom[:roomIndex], lobbyRoom[roomIndex+1:]...)
+				}
 				//更改玩家場景狀態
 				player.SetScene(SceneLobby)
 				mutex.Unlock()
@@ -223,6 +229,21 @@ func listenPlayerOperation(connP *net.Conn, player *Player) {
 		fmt.Println(payload)
 		time.Sleep(10 * time.Millisecond)
 	}
+}
+
+func isRoomEmpty(room *Room) bool {
+	return len(room.players) == 0
+}
+
+func getRoomIndex(room *Room) int {
+	var index int
+	for i, r := range lobbyRoom {
+		if r.RoomId == room.RoomId {
+			index = i
+			break
+		}
+	}
+	return index
 }
 
 func sendMsg(player *Player, payload string) int {
