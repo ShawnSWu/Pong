@@ -1,6 +1,8 @@
 # It's Pong Game!
-
 The Online Pong game server with Golang. Support multiplayer online
+
+### The Game Download
+ coming soon..
 
 ### The Game Download
 
