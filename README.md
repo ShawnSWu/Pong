@@ -4,10 +4,6 @@ The Online Pong game server with Golang. Support multiplayer online
 ### The Game Download
  coming soon..
 
-### The Game Download
-
-coming soon..
-
 ### Game View
 
 ### In menus:
