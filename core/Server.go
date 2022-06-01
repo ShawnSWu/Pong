@@ -26,7 +26,6 @@ var mutex sync.RWMutex
 //大廳玩家的連線
 var lobbyPlayer = make(map[string]*Player)
 
-//最多同時6間房間
 var lobbyRoom = make([]*Room, 0, MaxRoomCount)
 
 // roomChanMsg Room跟main goroutine的溝通channel

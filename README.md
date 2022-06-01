@@ -23,18 +23,16 @@ coming soon..
 
 
 
-
-### In menus:
+### In game:
 |  Key  |         Action         |
 |:-----:|:----------------------:|
-| Enter | Choose Selected Action |
 |   ↑   |    Scroll Actions Up   |
 |   ↓   |   Scroll Actions Down  |
-|   Z   |   Surrender  |
+|   Z   |        Surrender       |
 
-### In game:
-|  Key  |       Action      |
-|:-----:|:-----------------:|
+### In menus:
+|  Key  |          Action        |
+|:-----:|:----------------------:|
 | Enter | Choose Selected Action |
 |   ↑   |    Scroll Actions Up   |
 |   ↓   |   Scroll Actions Down  |
