@@ -56,7 +56,7 @@ func (r *Room) startGame() {
 		if conn1SendStatus == ConnBroken || conn2SendStatus == ConnBroken {
 			return
 		}
-		time.Sleep(90 * time.Millisecond)
+		time.Sleep(65 * time.Millisecond)
 	}
 }
 
@@ -240,6 +240,18 @@ func (r *Room) removeRoomPlayer(playerId string) {
 		}
 	}
 	r.players = append(r.players[:index], r.players[index+1:]...)
+}
+
+func (r *Room) setLoser(playerId string) {
+	var index int
+	for i, player := range r.players {
+		if player.IdAkaIpAddress != playerId {
+			index = i
+			break
+		}
+	}
+	player := r.players[index]
+	player.CurrentScore = FinalScore
 }
 
 func isTouchBottomBorder(paddle *Player) bool {

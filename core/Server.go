@@ -390,27 +390,9 @@ func listenRoomChannel() {
 
 				room := findRoomById(roomId)
 
-				//通知該玩家你已放棄此次戰鬥
-				giveUpPayload := generateMyselfGiveUpBattle(roomId)
-				sendMsg(lobbyPlayer[playerId], giveUpPayload)
-
-				//移除房間內此玩家,改變房間狀態 Waiting
-				room.removeRoomPlayer(playerId)
-				room.updateRoomStatus(RoomStatusWaiting)
-
-				//修改剩下來的玩家Scene
-				anotherPlayer := room.players[0]
-				anotherPlayer.SetScene(SceneRoom)
-
-				//通知另個玩家並讓此玩家回到房間內等待
-				payload = generateOpponentGiveUpBattle(room.RoomId, anotherPlayer.IdAkaIpAddress)
-				notifyRoomPlayer(room, payload)
-
-				time.Sleep(30 * time.Millisecond)
-				//讓玩家回到房間時，獲得當前房間狀態
-				notifyRoomPlayerUpdateRoomDetail(room)
-
-				logger.Log.Info(fmt.Sprintf(logger.CompetitorConnBrokenMsg, playerId))
+				// 直接設置Loser
+				room.setLoser(playerId)
+				logger.Log.Info(fmt.Sprintf("玩家 %s 已經發起投降！", playerId))
 				break
 
 			case BattleOverHeader:
