@@ -142,6 +142,7 @@ func (r *Room) updateState() bool {
 	over, _ := r.isGameOver()
 	if over == true {
 		msg := generateBattleOver(r.RoomId)
+		r.RoomStatus = RoomStatusWaiting
 		roomChanMsg <- msg
 		return false
 	}

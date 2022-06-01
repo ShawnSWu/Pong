@@ -312,6 +312,7 @@ func StartService() {
 	listener, _ := net.ListenTCP("tcp", tcpAddr)
 
 	go listenRoomChannel()
+	go notifyOnlinePlayerCount()
 
 	for {
 		logger.Log.Info("等待新玩家連線...")
@@ -344,6 +345,16 @@ func StartService() {
 		sendMsg(player, roomInfoPayload)
 
 		time.Sleep(10 * time.Millisecond)
+	}
+}
+
+func notifyOnlinePlayerCount() {
+	for {
+		onlinePlayerCount := len(lobbyPlayer)
+		payload := generateOnlinePlayerCountPayload(onlinePlayerCount)
+		// 在大廳才傳送
+		notifyLobbyPlayer(payload)
+		time.Sleep(2000 * time.Millisecond)
 	}
 }
 
@@ -535,50 +546,7 @@ func getRoomList() []RoomInfo {
 }
 
 func connBrokenHandle(connBrokenIp string) {
-	//如果此玩家正在遊戲中 則通知對手，然後刪除Room
-	playing, room := isPlayerPlaying(connBrokenIp)
-
-	//遊戲中的話則通知對手，然後刪除Room
-	if playing {
-		//有人斷線 刪除大廳中房間
-		lobbyRoom = removeRoom(lobbyRoom, room.RoomId)
-
-		player1 := room.players[0]
-		player2 := room.players[1]
-
-		//通知另一方對手已斷線
-		if player1.IdAkaIpAddress == connBrokenIp {
-			msg := generateConnBrokenPayload(player1.IdAkaIpAddress)
-			sendMsg(player2, msg)
-			//刪除房間
-			delete(lobbyPlayer, player2.IdAkaIpAddress)
-		} else {
-			msg := generateConnBrokenPayload(player2.IdAkaIpAddress)
-			sendMsg(player1, msg)
-			//刪除房間
-			delete(lobbyPlayer, player1.IdAkaIpAddress)
-		}
-	}
-
-	//如果沒有正在遊戲中，但在某間房間裡面，則更新那個房間的人數資訊(連線)
-	if room != nil {
-		var toRemoveIndex = -1
-		for i, player := range room.players {
-			if connBrokenIp == player.IdAkaIpAddress {
-				toRemoveIndex = i
-				break
-			}
-		}
-		if toRemoveIndex != -1 {
-			//移除此玩家在房間內的資料
-			room.players = append(room.players[:toRemoveIndex], room.players[toRemoveIndex+1:]...)
-		}
-	} else {
-		//沒在房間裡 就是在大廳，則更新大廳人數狀況
-		delete(lobbyPlayer, connBrokenIp)
-	}
-
-	disconnectPlayerConn(connBrokenIp)
+	//TODO 自動掃描斷線者處理
 }
 
 func generateRoomId() string {

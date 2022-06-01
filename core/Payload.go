@@ -9,8 +9,9 @@ const PayloadTerminator = "~"
 
 const ConnBrokenHeader = "CB" // Connection Broken 連線斷線訊息
 
-const RoomInfoHeader = "RL" // Room列表
-const LeaveLobby = "LL"     // Leave Lobby 離開大廳
+const RoomInfoHeader = "RL"    // Room列表
+const LeaveLobby = "LL"        // Leave Lobby 離開大廳
+const OnlinePlayerCount = "OC" // Leave Lobby 離開大廳
 
 const CreateRoomHeader = "CR" // Create Room 創建房間
 const RoomDetailHeader = "RD" // Room Detail 房間詳細內容
@@ -100,6 +101,11 @@ func generateOpponentGiveUpBattle(roomId string, interruptSponsor string) string
 
 func generateMyselfGiveUpBattle(roomId string) string {
 	return fmt.Sprintf("%s%s%s", GiveUpByMyselfHeader, roomId, PayloadTerminator)
+}
+
+func generateOnlinePlayerCountPayload(onlinePlayerCount int) string {
+	return fmt.Sprintf("%s%d%s", OnlinePlayerCount, onlinePlayerCount, PayloadTerminator)
+
 }
 
 func generateLeaveLobbySuccessPayload() string {
