@@ -307,8 +307,9 @@ func handleBattleOperation(userCommand string, player *Player) {
 }
 
 func StartService() {
+	host, port := ReadProperties("dev")
 
-	tcpAddr, _ := net.ResolveTCPAddr("tcp4", "127.0.0.1:4321")
+	tcpAddr, _ := net.ResolveTCPAddr("tcp4", fmt.Sprintf("%s:%s", host, port))
 	listener, _ := net.ListenTCP("tcp", tcpAddr)
 
 	go listenRoomChannel()
