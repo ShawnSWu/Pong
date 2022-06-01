@@ -1,12 +1,32 @@
 # It's Pong Game!
-The Online Pong game server with Golang.
-Support multiplayer online
+The Online Pong game server with Golang. Support multiplayer online
 
 ### The Game Download
  coming soon..
 
+### The Game Download
+
+coming soon..
 
 ### Game View
+
+### In menus:
+
+|  Key  |         Action         |
+|:-----:|:----------------------:|
+| Enter | Choose Selected Action |
+|   ↑   |    Scroll Actions Up   |
+|   ↓   |   Scroll Actions Down  |
+|   Z   |   Surrender            |
+
+### In game:
+
+|  Key  |       Action           |
+|:-----:|:----------------------:|
+| Enter | Choose Selected Action |
+|   ↑   |    Scroll Actions Up   |
+|   ↓   |   Scroll Actions Down  |
+
 
 ![](https://i.imgur.com/yFmyAsU.jpg)
 
