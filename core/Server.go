@@ -64,6 +64,14 @@ func listenPlayerOperation(connP *net.Conn, player *Player) {
 		case SceneLobby:
 
 			switch header {
+			//設玩家名字
+			case PlayerNameSetting:
+				playerId := conn.RemoteAddr().String()
+				playerName := parseSetPlayerName(payload)
+				player := lobbyPlayer[playerId]
+				player.NickName = playerName
+				break
+
 			//創建房間
 			case CreateRoomHeader:
 				playerId := conn.RemoteAddr().String()
