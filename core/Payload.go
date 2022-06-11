@@ -9,7 +9,8 @@ const PayloadTerminator = "~"
 
 const ConnBrokenHeader = "CB" // Connection Broken 連線斷線訊息
 
-const RoomInfoHeader = "RL"    // Room列表
+const RoomInfoHeader = "RL" // Room列表
+const PlayerNameSetting = "PN"
 const LeaveLobby = "LL"        // Leave Lobby 離開大廳
 const OnlinePlayerCount = "OC" // Leave Lobby 離開大廳
 
@@ -151,6 +152,11 @@ func parseInterruptBattle(payload string) (string, string) {
 	roomId := split[0]
 	playerId := split[1]
 	return roomId, playerId
+}
+
+func parseSetPlayerName(payload string) string {
+	playerName := payload
+	return playerName
 }
 
 func removeHeaderTerminator(payload string) string {

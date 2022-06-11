@@ -64,6 +64,14 @@ func listenPlayerOperation(connP *net.Conn, player *Player) {
 		case SceneLobby:
 
 			switch header {
+			//設玩家名字
+			case PlayerNameSetting:
+				playerId := conn.RemoteAddr().String()
+				playerName := parseSetPlayerName(payload)
+				player := lobbyPlayer[playerId]
+				player.NickName = playerName
+				break
+
 			//創建房間
 			case CreateRoomHeader:
 				playerId := conn.RemoteAddr().String()
@@ -94,6 +102,7 @@ func listenPlayerOperation(connP *net.Conn, player *Player) {
 
 				//通知所有『在大廳』的玩家
 				notifyLobbyPlayerUpdateRoomList()
+				logger.Log.Info(fmt.Sprintf("玩家 %s 創建房間", playerId))
 				break
 
 			//進入房間
@@ -390,10 +399,8 @@ func listenRoomChannel() {
 				connBrokenIp := msg
 				logger.Log.Info("")
 
-				mutex.Lock()
 				//斷線處理機制
 				connBrokenHandle(connBrokenIp)
-				mutex.Lock()
 
 				//處理完後，通知所有玩家，更新大廳與房間資訊
 				roomsInfo := generateRoomsListPayload()
@@ -546,7 +553,13 @@ func getRoomList() []RoomInfo {
 }
 
 func connBrokenHandle(connBrokenIp string) {
-	//TODO 自動掃描斷線者處理
+	mutex.Lock()
+	//關閉連線
+	disconnectPlayerConn(connBrokenIp)
+	delete(lobbyPlayer, connBrokenIp)
+	mutex.Unlock()
+
+	logger.Log.Error(fmt.Sprintf("玩家 %s 連線異常，中止連線", connBrokenIp))
 }
 
 func generateRoomId() string {
