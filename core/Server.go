@@ -5,6 +5,7 @@ import (
 	"bufio"
 	"fmt"
 	"net"
+	"os"
 	"strconv"
 	"sync"
 	"time"
@@ -315,7 +316,8 @@ func handleBattleOperation(userCommand string, player *Player) {
 }
 
 func StartService() {
-	host, port := ReadProperties("dev")
+	env := os.Getenv("PONG_ENV")
+	host, port := ReadProperties(env)
 
 	tcpAddr, _ := net.ResolveTCPAddr("tcp4", fmt.Sprintf("%s:%s", host, port))
 	listener, _ := net.ListenTCP("tcp", tcpAddr)
