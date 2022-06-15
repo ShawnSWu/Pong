@@ -211,8 +211,8 @@ func listenPlayerOperation(connP *net.Conn, player *Player) {
 						roomChanMsg <- generateStartBattlePayload(roomId)
 					}
 				}
-
-				notifyRoomPlayerUpdateRoomDetail(room)
+				//通知房間玩家準備開始戰鬥
+				go notifyRoomPlayerUpdateRoomDetail(room)
 				break
 			}
 			break
@@ -361,7 +361,8 @@ func StartService() {
 
 		if lobbyPlayer[playerId] == nil {
 			lobbyPlayer[playerId] = player
-			//notifyOnlinePlayerCount()
+			//通知所有玩家 有新玩家家加入
+			go notifyOnlinePlayerCount()
 			logger.Log.Info(fmt.Sprintf("Player ip:%s 進入大廳", playerId))
 		}
 
