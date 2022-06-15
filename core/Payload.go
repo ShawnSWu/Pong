@@ -8,6 +8,7 @@ import (
 const PayloadTerminator = "~"
 
 const ConnBrokenHeader = "CB" // Connection Broken 連線斷線訊息
+const HeartBeatHeader = "HB"  // Connection Broken 連線斷線訊息
 
 const RoomInfoHeader = "RL" // Room列表
 const PlayerNameSetting = "PN"

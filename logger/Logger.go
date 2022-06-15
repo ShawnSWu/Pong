@@ -6,6 +6,7 @@ import (
 	"github.com/spf13/cast"
 	"github.com/spf13/viper"
 	"gopkg.in/natefinch/lumberjack.v2"
+	"os"
 )
 
 var Log = &Logger{}
@@ -14,9 +15,12 @@ type Logger struct {
 }
 
 func readLoggerProperties() (string, string, string, string, string, string) {
-	viper.SetConfigName("logger")
+	env := os.Getenv("PONG_ENV")
+	viper.SetConfigName(fmt.Sprintf("%s", env))
 	viper.SetConfigType("properties")
-	viper.AddConfigPath("./")
+	viper.AddConfigPath("./properties")
+
+	fmt.Println(env)
 
 	err := viper.ReadInConfig()
 	if err != nil {

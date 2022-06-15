@@ -10,3 +10,5 @@ Pong
 .DS_Store
 
 prd.properties
+
+*.pem

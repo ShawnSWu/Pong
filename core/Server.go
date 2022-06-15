@@ -5,6 +5,7 @@ import (
 	"bufio"
 	"fmt"
 	"net"
+	"os"
 	"strconv"
 	"sync"
 	"time"
@@ -234,8 +235,22 @@ func listenPlayerOperation(connP *net.Conn, player *Player) {
 			time.Sleep(10 * time.Millisecond)
 			break
 		}
-		fmt.Println(payload)
+
+		//接收Client心跳封包
+		handleHeartBeatPayload(header, conn)
+
 		time.Sleep(10 * time.Millisecond)
+	}
+}
+
+func handleHeartBeatPayload(header string, conn net.Conn) {
+	//客戶端傳來的心跳封包 將count歸0
+	if header == HeartBeatHeader {
+		playerId := conn.RemoteAddr().String()
+		player := lobbyPlayer[playerId]
+		player.resetHeartbeat()
+
+		fmt.Println(fmt.Sprintf("連線仍然存活！玩家 %s 心跳計數歸零", playerId))
 	}
 }
 
@@ -315,13 +330,16 @@ func handleBattleOperation(userCommand string, player *Player) {
 }
 
 func StartService() {
-	host, port := ReadProperties("dev")
+	env := os.Getenv("PONG_ENV")
+	host, port := ReadProperties(env)
 
 	tcpAddr, _ := net.ResolveTCPAddr("tcp4", fmt.Sprintf("%s:%s", host, port))
 	listener, _ := net.ListenTCP("tcp", tcpAddr)
 
 	go listenRoomChannel()
-	go notifyOnlinePlayerCount()
+
+	//心跳封包機制
+	go checkPlayerHeartBeatJob()
 
 	for {
 		logger.Log.Info("等待新玩家連線...")
@@ -343,6 +361,7 @@ func StartService() {
 
 		if lobbyPlayer[playerId] == nil {
 			lobbyPlayer[playerId] = player
+			//notifyOnlinePlayerCount()
 			logger.Log.Info(fmt.Sprintf("Player ip:%s 進入大廳", playerId))
 		}
 
@@ -394,10 +413,9 @@ func listenRoomChannel() {
 			switch header {
 
 			case ConnBrokenHeader:
-				msg = removeHeaderTerminator(msg) //移除Header與終止符
+				msg = removeHeaderTerminator(msg)
 				//斷線者的ip
 				connBrokenIp := msg
-				logger.Log.Info("")
 
 				//斷線處理機制
 				connBrokenHandle(connBrokenIp)
@@ -451,32 +469,24 @@ func listenRoomChannel() {
 	}
 }
 
-func isPlayerPlaying(playerIp string) (bool, *Room) {
-	room := getPlayerRoom(playerIp)
-	isPlaying := false
-
-	if room != nil && room.RoomStatus == RoomStatusPlaying {
-		isPlaying = true
-	}
-	return isPlaying, room
-}
-
-func getPlayerRoom(playerIp string) *Room {
-	var roomIndex int
-	found := false
-	for i, r := range lobbyRoom {
-		for _, player := range r.players {
-			if playerIp == player.IdAkaIpAddress {
-				roomIndex = i
-				found = true
-				break
+func checkPlayerHeartBeatJob() {
+	//when count < 5，count += 1
+	//whe count >= 5，說明已超過15秒未收到該玩家心跳封包，則判定該玩家已經斷線；
+	for {
+		for _, player := range lobbyPlayer {
+			if player.HearBeatCount < 5 {
+				fmt.Println(fmt.Sprintf("玩家 %s 心跳跳一下, 當前倒數心跳:%d", player.IdAkaIpAddress, player.HearBeatCount))
+				player.Heartbeat()
+			}
+			if player.HearBeatCount >= 5 {
+				//斷線處理
+				fmt.Println(fmt.Sprintf("玩家%s斷線了", player.IdAkaIpAddress))
+				connBrokenHandle(player.IdAkaIpAddress)
 			}
 		}
-		if found == true {
-			break
-		}
+		time.Sleep(3000 * time.Millisecond)
 	}
-	return lobbyRoom[roomIndex]
+
 }
 
 func findRoomById(id string) *Room {
