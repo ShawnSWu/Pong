@@ -339,7 +339,7 @@ func StartService() {
 	go listenRoomChannel()
 
 	//心跳封包機制
-	go checkPlayerHeartBeatJob()
+	go heartBeatJob()
 
 	for {
 		logger.Log.Info("等待新玩家連線...")
@@ -470,7 +470,7 @@ func listenRoomChannel() {
 	}
 }
 
-func checkPlayerHeartBeatJob() {
+func heartBeatJob() {
 	//when count < 5，count += 1
 	//whe count >= 5，說明已超過15秒未收到該玩家心跳封包，則判定該玩家已經斷線；
 	for {
@@ -483,6 +483,12 @@ func checkPlayerHeartBeatJob() {
 				//斷線處理
 				fmt.Println(fmt.Sprintf("玩家%s斷線了", player.IdAkaIpAddress))
 				connBrokenHandle(player.IdAkaIpAddress)
+				//移除斷線者房間
+				room := findPlayerRoom(player.IdAkaIpAddress)
+				if room != nil {
+					removeRoom(lobbyRoom, room.RoomId)
+					logger.Log.Info(fmt.Sprintf("移除斷線者房間 名稱：%s, id: %s", room.Name, room.RoomId))
+				}
 			}
 		}
 		time.Sleep(3000 * time.Millisecond)
@@ -499,6 +505,18 @@ func findRoomById(id string) *Room {
 		}
 	}
 	return lobbyRoom[targetIndex]
+}
+
+func findPlayerRoom(playerId string) *Room {
+	var targetRoom *Room
+	for i, room := range lobbyRoom {
+		for _, player := range room.players {
+			if player.IdAkaIpAddress == playerId {
+				targetRoom = lobbyRoom[i]
+			}
+		}
+	}
+	return targetRoom
 }
 
 func removeRoom(rooms []*Room, roomId string) []*Room {
