@@ -6,7 +6,7 @@ A mini pong game server that support multiplayer online, Motivation at the begin
 
 If you are interested in the client side, you can visit this [Link](https://github.com/ShawnSWu/PongOnlineGameClient)
 
-The Start button is currently unavailable, I'm sorry for this, I want to focus on the online game function for this project, I'll add it in the future (maybe).
+The Start button is currently unavailable, I'm sorry for this, I want to focus on the online game features, I'll add it in the future (maybe).
 
 If you try to play online and the server is not running, please contact me.
 
